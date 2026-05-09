@@ -93,6 +93,20 @@
         <div class="f-menu" id="menuType"><!-- rempli dynamiquement --></div>
       </div>
 
+      <!-- Etat -->
+      <div class="f-dropdown" id="ddEtat">
+        <button class="f-btn" onclick="toggleDropdown('ddEtat')">
+          Etat <span class="f-badge" id="badgeEtat"></span>
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6,9 12,15 18,9"/></svg>
+        </button>
+        <div class="f-menu" id="menuEtat">
+          <label class="f-item f-item-all"><input type="checkbox" class="cb-selectall" onchange="selectAll('menuEtat')"> Tout sélectionner</label>
+          <div class="f-divider"></div>
+          <label class="f-item"><input type="checkbox" value="betonne" onchange="syncSelectAll('menuEtat')"> Bétonné</label>
+          <label class="f-item"><input type="checkbox" value="fore" onchange="syncSelectAll('menuEtat')"> Foré</label>
+        </div>
+      </div>
+
       <button class="f-reset" onclick="resetFilters()">✕ Réinitialiser</button>
       <span class="f-count" id="elementCount">— éléments</span>
     </div>
@@ -148,7 +162,7 @@
         <!-- BOTTOM ROW: Table uniquement -->
         <div class="bottom-row">
           <div class="card" style="flex:1">
-            <p class="card-title">Détail par zone</p>
+            <p class="card-title">Détail par Pieu</p>
             <div class="table-wrap">
               <table>
                 <thead><tr><th>ZONE</th><th>NB</th><th>VOLUME (m³)</th><th>BÉTONNÉS</th><th>FORÉS</th><th>%</th></tr></thead>

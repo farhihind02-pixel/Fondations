@@ -243,19 +243,25 @@ function updateBadge(badgeId, values) {
 }
 
 function applyFilters() {
-  const zones     = getCheckedValues('menuZone');
-  const dirs      = getCheckedValues('menuDirection');
-  const types     = getCheckedValues('menuType');
+  const zones = getCheckedValues('menuZone');
+  const dirs  = getCheckedValues('menuDirection');
+  const types = getCheckedValues('menuType');
+  const etats = getCheckedValues('menuEtat');
 
   updateBadge('badgeZone',      zones);
   updateBadge('badgeDirection', dirs);
   updateBadge('badgeType',      types);
+  updateBadge('badgeEtat',      etats);
 
   filteredElements = allElements.filter(e => {
     const okZone = zones.length === 0 || zones.includes(e.zone);
     const okDir  = dirs.length  === 0 || dirs.includes(e.direction);
     const okType = types.length === 0 || types.includes(e.famille);
-    return okZone && okDir && okType;
+    const okEtat = etats.length === 0 || (
+      (etats.includes('betonne') && e.betonne === 1) ||
+      (etats.includes('fore')    && e.fore    === 1)
+    );
+    return okZone && okDir && okType && okEtat;
   });
 
   refresh();
@@ -264,7 +270,7 @@ function applyFilters() {
 
 function resetFilters() {
   document.querySelectorAll('.f-menu input[type="checkbox"]').forEach(cb => cb.checked = false);
-  ['badgeZone','badgeDirection','badgeType'].forEach(id => {
+  ['badgeZone','badgeDirection','badgeType','badgeEtat'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.textContent = ''; el.classList.remove('visible'); }
   });
@@ -489,18 +495,24 @@ function updateViewerHighlight() {
   if (!viewerLoaded || !viewer || !window.THREE) return;
   if (!hasActiveFilters()) { resetViewerHighlight(); return; }
 
-  viewer.showAll();
+  viewer.clearThemingColors();
   const filteredIds = new Set(filteredElements.map(e => e.dbId).filter(id => typeof id === 'number'));
   const allIds = allElements.map(e => e.dbId).filter(id => typeof id === 'number');
 
-  const orange = new THREE.Vector4(0.91, 0.275, 0.039, 1);
-  const grey   = new THREE.Vector4(0.55, 0.55, 0.55, 0.25);
+  const orange      = new THREE.Vector4(1.0, 0.549, 0.294, 1);   // #FF8C4B
+  const transparent = new THREE.Vector4(0.4, 0.4, 0.4, 0.15);    // très atténué
 
-  allIds.forEach(id => viewer.setThemingColor(id, filteredIds.has(id) ? orange : grey));
+  allIds.forEach(id => {
+    viewer.setThemingColor(id, filteredIds.has(id) ? orange : transparent);
+  });
+  viewer.impl && viewer.impl.invalidate(true, true, true);
 }
 
 function resetViewerHighlight() {
   if (!viewerLoaded || !viewer) return;
-  viewer.showAll();
+  // Reset agressif : alpha=0 sur chaque element puis clearThemingColors global
+  const allIds = allElements.map(e => e.dbId).filter(id => typeof id === 'number');
+  allIds.forEach(id => viewer.setThemingColor(id, new THREE.Vector4(0, 0, 0, 0)));
   viewer.clearThemingColors();
+  viewer.impl && viewer.impl.invalidate(true, true, true);
 }
