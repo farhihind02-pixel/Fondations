@@ -15,8 +15,8 @@ const {
 } = process.env;
 
 // ── Maquette Fondations ───────────────────────────────────────────────────────
-const VERSION_URN   = 'urn:adsk.wipprod:fs.file:vf.XLwcx4YUVROV6idLRuBSLg?version=1';
-const VIEWABLE_GUID = '51de9167-5c01-ab73-d85b-8569c525f054';
+const VERSION_URN = 'urn:adsk.wipprod:fs.file:vf.0LwmJuH-SAWi2dOPjrIYgA?version=5';
+const VIEWABLE_GUID = 'f84d05f4-bbee-31de-0f8d-8e2feaf49fc0';
 const DERIVATIVE_URN = Buffer.from(VERSION_URN).toString('base64')
   .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 
@@ -153,57 +153,120 @@ app.get('/api/properties', async (_req, res) => {
     const collection = (propsData.data && propsData.data.collection) || [];
     const elements   = [];
 
+    // ─────────────────────────────────────────────────────────
+    // Lecture insensible à la casse, tirets, underscores, espaces
+    // Exemples : "OOP-BETONNE", "OOP_Betonne", "OOP BETONNE" → tous trouvés
+    // ─────────────────────────────────────────────────────────
+    function normKey(s) { return String(s).replace(/[\s\-_]/g, '').toLowerCase(); }
+    function buildPropMap(properties) {
+      const map = {};
+      for (const group of Object.values(properties || {})) {
+        if (typeof group !== 'object' || group === null) continue;
+        for (const [k, v] of Object.entries(group)) { map[normKey(k)] = v; }
+      }
+      return (name) => map[normKey(name)];
+    }
+
+    // Convertit "Yes"/"No"/1/0/true/false → 1 ou 0
+    function toBool(v) {
+      if (v === null || v === undefined || v === '') return 0;
+      const s = String(v).trim().toLowerCase();
+      return (s === 'yes' || s === '1' || s === 'true' || s === 'oui') ? 1 : 0;
+    }
+
     for (const obj of collection) {
-      const allProps = {};
-      for (const group of Object.values(obj.properties || {})) {
-        if (typeof group === 'object' && group !== null) Object.assign(allProps, group);
-      }
-      // ME_ELEMENT TYPE = "SI" (semelles) ou "PI" (pieux)
-      const typeCode = allProps['ME_ELEMENT TYPE'] || '';
-      if (!typeCode) continue;
+      const P = buildPropMap(obj.properties);
 
-      const famille  = allProps['OOP_Famille'] || typeCode;
-      const zone     = allProps['OOP_Zone'] || allProps['ME_ELEMENT ZONE'] || 'N/A';
-      const subType  = allProps['OOP_Sub Type'] || allProps['ME_ELEMENT SUB TYPE'] || '';
-      const niveau   = allProps['OOP_Niveau'] || allProps['ME_ELEMENT LEVEL'] || '';
-      const categorie = typeCode === 'PI' ? 'Pieux' : 'Semelles';
+      // ME_ELEMENT TYPE : PI = pieux, SI = semelles
+      const typeCode = String(P('ME_ELEMENT TYPE') || '').trim().toUpperCase();
+      if (typeCode !== 'PI' && typeCode !== 'SI') continue;
 
-      // Volume
-      // PI : ME_VOLUME en m³ directement
-      // SI : ME_AREA (m²) × "Epaisseur de fondation" (m)
-      let volume = 0;
-      if (typeCode === 'PI' && allProps['ME_VOLUME']) {
-        volume = Math.round(parseFloat(allProps['ME_VOLUME']) * 100) / 100;
-      } else if (typeCode === 'SI') {
-        const area = parseFloat(allProps['ME_AREA']) || 0;
-        const epaisseur = parseFloat(allProps['Epaisseur de fondation'] || allProps['Foundation Thickness'] || allProps['ME_WIDTH B'] || 0);
-        if (area > 0 && epaisseur > 0) {
-          volume = Math.round(area * epaisseur * 100) / 100;
-        }
-      }
+      // Garder toutes les instances PI (y compris celles sans crochet dans le nom)
+      // Les définitions de type Revit pures n'ont pas ME_ELEMENT TYPE = PI donc déjà exclues
 
-      // Elévations (profondeurs)
-      const elevBase = parseFloat(allProps['Elévation à la base'] || allProps['Base Elevation'] || allProps['Elevation at Bottom'] || 0);
-      const elevHaut = parseFloat(allProps['Elévation en haut']   || allProps['Top Elevation']  || allProps['Elevation at Top']    || 0);
+      // OOP-BETONNE : "Yes" = bétonné  (tiret, dans groupe "Autre")
+      const betonne = toBool(P('OOP-BETONNE'));
+
+      // OOP-FORE : "Yes" = foré  (tiret, dans groupe "Autre")
+      const fore = toBool(P('OOP-FORE'));
+
+      const famille   = String(P('OOP_Type') || P('OOP_Famille') || typeCode).trim();
+      const zone      = String(P('OOP_Zone') || '').trim();
+      const direction = String(P('OOF_ZONE') || '').trim().toUpperCase();
+      const subType   = String(P('OOP_Sub Type') || P('ME_ELEMENT SUB TYPE') || '').trim();
+
+      // Volume (ME_VOLUME en m³, uniquement sur les PI)
+      const rawVol = String(P('ME_VOLUME') || '').replace(/[^0-9.]/g, '');
+      const volume = Math.round((parseFloat(rawVol) || 0) * 100) / 100;
+
+      // Longueur (ME_LENGTH en m, ex : "18.000 m" → 18)
+      const rawLen = String(P('ME_LENGTH') || '').replace(/[^0-9.]/g, '');
+      const length = parseFloat(rawLen) || 0;
+
+      // Élévations
+      const rawEB = String(P('Elevation a la base') || P('Elevation base') || '0').replace(/[^0-9.\-]/g, '');
+      const rawEH = String(P('Elevation en haut')   || P('Elevation haut') || '0').replace(/[^0-9.\-]/g, '');
+      const elevBase = parseFloat(rawEB) || 0;
+      const elevHaut = parseFloat(rawEH) || 0;
 
       elements.push({
-        dbId: obj.objectid,
-        name: obj.name || '',
-        elementType: typeCode,
-        famille,
-        categorie,
-        zone,
-        subType,
-        niveau,
-        volume,
+        dbId:        obj.objectid,
+        name:        obj.name || '',
+        elementType: typeCode,       // 'PI' ou 'SI'
+        famille,                     // OOP_Type (ex: "PIEUX", "SI-A")
+        zone,                        // OOP_Zone (ex: "3", "9")
+        direction,                   // OOF_ZONE (ex: "SE", "NE")
+        subType,                     // ME_ELEMENT SUB TYPE
+        volume,                      // m³
+        length,                      // ml
+        betonne,                     // 1 si OOP-BETONNE = "Yes"
+        fore,                        // 1 si OOP-FORE = "Yes"
         elevBase,
-        elevHaut
+        elevHaut,
       });
     }
     res.json({ total: elements.length, elements });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ── DIAGNOSTIC : compte PI avec/sans crochet ─────────────
+app.get('/api/count-pi', async (_req, res) => {
+  try {
+    const token = await getValidToken();
+    const metaResp = await fetch(
+      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const metaData = await metaResp.json();
+    const metaList = (metaData.data && metaData.data.metadata) || [];
+    const guid = metaList.find(m => m.role === '3d')?.guid || metaList[0]?.guid;
+    const propsResp = await fetch(
+      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata/${guid}/properties?forceget=true`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const propsData = await propsResp.json();
+    const collection = propsData.data?.collection || [];
+    function nk(s) { return String(s).replace(/[\s\-_]/g,'').toLowerCase(); }
+    function bp(props) {
+      const m = {};
+      for (const g of Object.values(props||{})) {
+        if (typeof g==='object' && g) for (const [k,v] of Object.entries(g)) m[nk(k)]=v;
+      }
+      return n => m[nk(n)];
+    }
+    let total=0, withB=0, withoutB=0;
+    const sans = [];
+    for (const obj of collection) {
+      const P = bp(obj.properties);
+      if (String(P('ME_ELEMENT TYPE')||'').trim().toUpperCase() !== 'PI') continue;
+      total++;
+      if (obj.name && obj.name.includes('[')) { withB++; }
+      else { withoutB++; if(sans.length<20) sans.push({id:obj.objectid,name:obj.name}); }
+    }
+    res.json({ totalPI: total, withBracket: withB, withoutBracket: withoutB, exemples: sans });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/debug-props', async (_req, res) => {
