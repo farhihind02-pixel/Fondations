@@ -327,23 +327,27 @@ function mkChart(id, type, data, options) {
 }
 
 function updateCharts() {
-  // ── Volumes par Zone (barres) ──────────────────────────
+  // ── Avancement par Zone : Réalisé vs Total ───────────
   const byZone = {};
   filteredElements.forEach(e => {
     const lbl = e.zone ? `Zone ${e.zone}` : '—';
-    byZone[lbl] = (byZone[lbl] || 0) + (e.volume || 0);
+    if (!byZone[lbl]) byZone[lbl] = { total: 0, realise: 0 };
+    byZone[lbl].total   += e.volume || 0;
+    if (e.betonne === 1) byZone[lbl].realise += e.volume || 0;
   });
   const zoneSorted = Object.keys(byZone).sort((a, b) => a.localeCompare(b,'fr',{numeric:true}));
   mkChart('chartBloc', 'bar', {
     labels: zoneSorted,
-    datasets: [{
-      label: 'Volume (m³)',
-      data: zoneSorted.map(z => byZone[z]),
-      backgroundColor: '#ffa017', borderRadius: 5, borderSkipped: false,
-    }]
+    datasets: [
+      { label: 'Réalisé', data: zoneSorted.map(z => byZone[z].realise), backgroundColor: '#ffa017', borderRadius: 5, borderSkipped: false },
+      { label: 'Total',   data: zoneSorted.map(z => byZone[z].total),   backgroundColor: '#9ca3af', borderRadius: 5, borderSkipped: false }
+    ]
   }, {
     responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false }, tooltip: TT },
+    plugins: {
+      legend: { ...LEG, position: 'bottom' },
+      tooltip: { ...TT, callbacks: { label: ctx => ' ' + fmt(ctx.raw) + ' m³' } }
+    },
     scales: {
       x: { grid: { display: false }, ticks: { color: '#6b7280', font: { size: 10 } } },
       y: { grid: { color: '#f0f0f0' }, ticks: { color: '#6b7280', font: { size: 10 }, callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v } }
