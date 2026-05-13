@@ -15,7 +15,12 @@
   <!-- SIDEBAR -->
   <aside class="sidebar">
     <div class="brand">
-      <img src="logo_SGTM.jpg" alt="SGTM" class="brand-logo" />
+      <div class="sgtm-logo-full">
+        <svg viewBox="0 0 96 72" fill="none" width="64" height="48">
+          <polygon points="48,2 70,36 26,36" fill="#ffa017"/>
+          <text x="1" y="68" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="25" fill="white" letter-spacing="1.5">SGTM</text>
+        </svg>
+      </div>
       <span class="brand-sub">FONDATIONS & PIEUX</span>
       <span class="brand-mod">Lot 3</span>
     </div>
@@ -104,18 +109,18 @@
         <!-- KPI ROW -->
         <div class="kpi-row">
           <div class="kpi kpi-accent">
-            <span class="kpi-label">PROFONDEUR TOTALE PIEUX <span class="unit">(ml)</span></span>
+            <span class="kpi-label">PROFONDEUR TOTALE PIEUX</span>
             <span class="kpi-val orange" id="kpiPieuxCount">—</span>
             <span class="kpi-sub" id="kpiPieuxVolume">ml</span>
           </div>
           <div class="kpi">
             <span class="kpi-label">VOLUME TOTAL</span>
             <span class="kpi-val" id="kpiTotalCount">—</span>
-            <span class="kpi-sub" id="kpiTotalVolume">m³</span>
+            <span class="kpi-sub" id="kpiTotalVolume"></span>
           </div>
           <div class="kpi kpi-with-donut">
             <div class="kpi-left-block">
-              <span class="kpi-label">Volume réalisé <span class="unit">(m³)</span></span>
+              <span class="kpi-label">Volume réalisé</span>
               <span class="kpi-val orange" id="kpiBetonne">—</span>
               <span class="kpi-sub" id="kpiBetonneVolume">— éléments bétonnés</span>
             </div>
@@ -123,7 +128,7 @@
           </div>
           <div class="kpi kpi-with-donut">
             <div class="kpi-left-block">
-              <span class="kpi-label">PROFONDEUR FORÉE <span class="unit">(ml)</span></span>
+              <span class="kpi-label">PROFONDEUR FORÉE</span>
               <span class="kpi-val navy" id="kpiFore">—</span>
               <span class="kpi-sub" id="kpiForeLength">— ml</span>
             </div>

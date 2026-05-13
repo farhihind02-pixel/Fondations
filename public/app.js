@@ -282,10 +282,10 @@ function updateKPIs() {
   const pLen   = sum(pieux, 'length');
   const pVol   = sum(pieux, 'volume');
 
-  document.getElementById('kpiPieuxCount').textContent  = fmt(pLen);
+  document.getElementById('kpiPieuxCount').textContent  = fmt(pLen) + ' ml';
   document.getElementById('kpiPieuxVolume').textContent = `${pieux.length.toLocaleString('fr-FR')} pieux`;
-  document.getElementById('kpiTotalCount').textContent  = fmt(pVol);
-  document.getElementById('kpiTotalVolume').textContent = 'm³';
+  document.getElementById('kpiTotalCount').textContent  = fmt(pVol) + ' m³';
+  document.getElementById('kpiTotalVolume').textContent = '';
 
   // BÉTONNÉS = éléments avec OOP_BETONNE === 1
   // Le serveur retourne betonne = 1 (number) quand OOP_BETONNE vaut 1
@@ -293,7 +293,7 @@ function updateKPIs() {
   const bCount   = betonnes.length;
   const bVol     = sum(betonnes, 'volume');
 
-  document.getElementById('kpiBetonne').textContent       = fmt(bVol);
+  document.getElementById('kpiBetonne').textContent       = fmt(bVol) + ' m³';
   document.getElementById('kpiBetonneVolume').textContent  = bCount.toLocaleString('fr-FR') + ' éléments bétonnés';
 
 
@@ -308,7 +308,7 @@ function updateKPIs() {
   const unionCount = unionFB.length;
 
   document.getElementById('kpiFore').textContent       = fmt(profFore) + ' ml';
-  document.getElementById('kpiForeLength').textContent = unionCount.toLocaleString('fr-FR') + ' éléments (forés + bétonnés)';
+  document.getElementById('kpiForeLength').textContent = unionCount.toLocaleString('fr-FR') + ' éléments';
 
 }
 
