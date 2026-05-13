@@ -2,7 +2,7 @@
    SGTM FONDATIONS — style.css  (Pieux uniquement)
 ═══════════════════════════════════════════════════════════ */
 :root {
-  --orange:      #FF8C4B;
+  --orange:      #ffa017;
   --orange-bg:   rgba(232,70,10,0.12);
   --navy:        #1e3a5f;
   --navy-bg:     rgba(30,58,95,0.12);
@@ -62,9 +62,9 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 /* ── TOPBAR ──────────────────────────────────────────── */
 .topbar { height: var(--topbar-h); background: var(--dark); border-bottom: 1px solid var(--dark-border); display: flex; align-items: center; padding: 0 16px; gap: 16px; flex-shrink: 0; }
 .topbar-meta { font-size: 0.9rem; color: #ffffff; white-space: nowrap; flex-shrink: 0; }
-.tp-label { color: #FF8C4B; font-weight: 700; font-size: 0.9rem; letter-spacing: .8px; text-transform: uppercase; }
+.tp-label { color: #ffa017; font-weight: 700; font-size: 0.9rem; letter-spacing: .8px; text-transform: uppercase; }
 .tp-sep { color: var(--dark-border); margin: 0 4px; }
-.topbar-title { font-size: 1.1rem; font-weight: 700; color: #FF8C4B; white-space: nowrap; flex-shrink: 0; margin-left: auto; }
+.topbar-title { font-size: 1.1rem; font-weight: 700; color: #ffa017; white-space: nowrap; flex-shrink: 0; margin-left: auto; }
 .topbar-right { display: flex; align-items: center; gap: 7px; margin-left: auto; flex-shrink: 0; }
 
 .acc-pill { display: flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 99px; font-size: 0.74rem; font-weight: 500; border: 1px solid var(--dark-border); }
@@ -182,7 +182,7 @@ tbody tr:hover { background: #fafbfc; }
 .td-dim  { color: var(--muted); font-size: 0.9rem; }
 .badge-p { background: var(--orange-bg); color: var(--orange); padding: 1px 6px; border-radius: 3px; font-size: 0.65rem; font-weight: 700; }
 .badge-zone { background: #f0f4ff; color: #1e3a5f; padding: 2px 8px; border-radius: 3px; font-weight: 700; white-space: nowrap; }
-.td-orange { color: #FF8C4B; font-weight: 600; }
+.td-orange { color: #ffa017; font-weight: 600; }
 .td-navy   { color: #1e3a5f; font-weight: 600; }
 .pct-inline { display: flex; align-items: center; gap: 6px; }
 .pct-track { flex: 1; max-width: 55px; height: 3px; background: var(--border); border-radius: 99px; }

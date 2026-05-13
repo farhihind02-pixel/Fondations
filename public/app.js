@@ -19,11 +19,11 @@ const DIR_LABELS = {
 };
 
 const TYPE_COLORS = {
-  'Pieu BA-ST': '#FF8C4B',
+  'Pieu BA-ST': '#ffa017',
   'Pieu BA-PC': '#f97316',
-  'BA_ST':      '#FF8C4B',
+  'BA_ST':      '#ffa017',
   'BA_PC':      '#f97316',
-  'PI':         '#FF8C4B',
+  'PI':         '#ffa017',
 };
 
 // ── DONNÉES STATIQUES FALLBACK ────────────────────────────
@@ -339,7 +339,7 @@ function updateCharts() {
     datasets: [{
       label: 'Volume (m³)',
       data: zoneSorted.map(z => byZone[z]),
-      backgroundColor: '#FF8C4B', borderRadius: 5, borderSkipped: false,
+      backgroundColor: '#ffa017', borderRadius: 5, borderSkipped: false,
     }]
   }, {
     responsive: true, maintainAspectRatio: false,
@@ -360,7 +360,7 @@ function updateCharts() {
     labels: [`Bétonné — ${bPct}%`, `Non bétonné — ${100 - bPct}%`],
     datasets: [{
       data: [betonneVol, resteVol],
-      backgroundColor: ['#FF8C4B', '#e5e7eb'],
+      backgroundColor: ['#ffa017', '#e5e7eb'],
       borderWidth: 3, borderColor: '#fff', hoverOffset: 4,
     }]
   }, {
@@ -376,7 +376,7 @@ function updateCharts() {
   const nbN = filteredElements.length - bN;
   mkChart('chartBetonneKpi', 'doughnut', {
     labels: ['Bétonnés','Non bétonnés'],
-    datasets: [{ data: [bN, nbN], backgroundColor: ['#FF8C4B','#e5e7eb'], borderWidth: 0 }]
+    datasets: [{ data: [bN, nbN], backgroundColor: ['#ffa017','#e5e7eb'], borderWidth: 0 }]
   }, {
     responsive: true, maintainAspectRatio: false, cutout: '72%',
     plugins: { legend: { display: false }, tooltip: { enabled: false } }
@@ -496,11 +496,11 @@ function showViewerLogin() {
   const ph = document.getElementById('viewerPlaceholder');
   if (ph) ph.innerHTML = `
     <div class="viewer-ph-inner">
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#FF8C4B" stroke-width="1.5">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ffa017" stroke-width="1.5">
         <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
       </svg>
       <p style="color:#6b7280;margin-bottom:12px">Connectez-vous avec votre compte Autodesk</p>
-      <button onclick="window.location.href='/api/auth/login'" style="background:#FF8C4B;color:#fff;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit">
+      <button onclick="window.location.href='/api/auth/login'" style="background:#ffa017;color:#fff;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit">
         Se connecter à ACC
       </button>
     </div>`;
@@ -552,7 +552,7 @@ function updateViewerHighlight() {
   const filteredIds = new Set(filteredElements.map(e => e.dbId).filter(id => typeof id === 'number'));
   const allIds = allElements.map(e => e.dbId).filter(id => typeof id === 'number');
 
-  const orange      = new THREE.Vector4(1.0, 0.549, 0.294, 1);   // #FF8C4B
+  const orange      = new THREE.Vector4(1.0, 0.549, 0.294, 1);   // #ffa017
   const transparent = new THREE.Vector4(0.4, 0.4, 0.4, 0.15);    // très atténué
 
   allIds.forEach(id => {
