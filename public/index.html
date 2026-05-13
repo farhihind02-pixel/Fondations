@@ -15,7 +15,14 @@
   <!-- SIDEBAR -->
   <aside class="sidebar">
     <div class="brand">
-      <span class="brand-name">SGTM</span>
+       <div class="sgtm-logo-full">
+        <svg viewBox="0 0 96 72" fill="none" width="64" height="48">
+          <!-- Triangle orange centré sur le T (entre S et G) -->
+          <polygon points="48,2 70,36 26,36" fill="#ffa017"/>
+          <!-- Lettres SGTM avec plus d'espace -->
+          <text x="1" y="68" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="25" fill="white" letter-spacing="1.5">SGTM</text>
+        </svg>
+      </div>
       <span class="brand-sub">FONDATIONS & PIEUX</span>
       <span class="brand-mod">Lot 3</span>
     </div>
@@ -75,23 +82,7 @@
         <div class="f-menu" id="menuZone"><!-- rempli dynamiquement --></div>
       </div>
 
-      <!-- Direction -->
-      <div class="f-dropdown" id="ddDirection">
-        <button class="f-btn" onclick="toggleDropdown('ddDirection')">
-          Orientation <span class="f-badge" id="badgeDirection"></span>
-          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6,9 12,15 18,9"/></svg>
-        </button>
-        <div class="f-menu" id="menuDirection"><!-- rempli dynamiquement --></div>
-      </div>
 
-      <!-- Type Pieu -->
-      <div class="f-dropdown" id="ddType">
-        <button class="f-btn" onclick="toggleDropdown('ddType')">
-          Type <span class="f-badge" id="badgeType"></span>
-          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6,9 12,15 18,9"/></svg>
-        </button>
-        <div class="f-menu" id="menuType"><!-- rempli dynamiquement --></div>
-      </div>
 
       <!-- Etat -->
       <div class="f-dropdown" id="ddEtat">
@@ -120,9 +111,9 @@
         <!-- KPI ROW -->
         <div class="kpi-row">
           <div class="kpi kpi-accent">
-            <span class="kpi-label">PIEUX (Total)</span>
+            <span class="kpi-label">PROFONDEUR TOTALE PIEUX <span class="unit">(ml)</span></span>
             <span class="kpi-val orange" id="kpiPieuxCount">—</span>
-            <span class="kpi-sub" id="kpiPieuxVolume">— m³</span>
+            <span class="kpi-sub" id="kpiPieuxVolume">ml</span>
           </div>
           <div class="kpi">
             <span class="kpi-label">VOLUME TOTAL</span>
@@ -131,15 +122,15 @@
           </div>
           <div class="kpi kpi-with-donut">
             <div class="kpi-left-block">
-              <span class="kpi-label">ÉLÉMENTS BÉTONNÉS</span>
+              <span class="kpi-label">Volume réalisé <span class="unit">(m³)</span></span>
               <span class="kpi-val orange" id="kpiBetonne">—</span>
-              <span class="kpi-sub" id="kpiBetonneVolume">— m³</span>
+              <span class="kpi-sub" id="kpiBetonneVolume">— éléments bétonnés</span>
             </div>
             <div class="kpi-donut-mini"><canvas id="chartBetonneKpi"></canvas></div>
           </div>
           <div class="kpi kpi-with-donut">
             <div class="kpi-left-block">
-              <span class="kpi-label">ÉLÉMENTS FORÉS</span>
+              <span class="kpi-label">PROFONDEUR FORÉE <span class="unit">(ml)</span></span>
               <span class="kpi-val navy" id="kpiFore">—</span>
               <span class="kpi-sub" id="kpiForeLength">— ml</span>
             </div>
@@ -159,17 +150,43 @@
           </div>
         </div>
 
-        <!-- BOTTOM ROW: Table uniquement -->
-        <div class="bottom-row">
-          <div class="card" style="flex:1">
-            <p class="card-title">Détail par Pieu</p>
+        <!-- BOTTOM ROW: 2 tableaux avancement -->
+        <div class="bottom-row" style="flex-direction:column;gap:10px">
+
+          <!-- TABLEAU COULAGE -->
+          <div class="card" style="flex:none">
+            <p class="card-title avancement-title">⬛ AVANCEMENT COULAGE PIEUX</p>
             <div class="table-wrap">
-              <table>
-                <thead><tr><th>ZONE</th><th>NB</th><th>VOLUME (m³)</th><th>BÉTONNÉS</th><th>FORÉS</th><th>%</th></tr></thead>
-                <tbody id="detailTableBody"></tbody>
+              <table class="tbl-avancement">
+                <thead>
+                  <tr class="thead-av">
+                    <th>ÉLÉMENT</th><th>DIM.</th><th>NB TOTAL</th><th>NB RÉALISÉ</th>
+                    <th>VOLUME TOTAL <span class="unit">m³</span></th><th>VOLUME RÉALISÉ <span class="unit">m³</span></th><th>% AVANC.</th>
+                  </tr>
+                </thead>
+                <tbody id="tableCoulageBody"></tbody>
+                <tfoot id="tableCoulageFoot"></tfoot>
               </table>
             </div>
           </div>
+
+          <!-- TABLEAU FORAGE -->
+          <div class="card" style="flex:none">
+            <p class="card-title avancement-title">⬛ AVANCEMENT FORAGE PIEUX</p>
+            <div class="table-wrap">
+              <table class="tbl-avancement">
+                <thead>
+                  <tr class="thead-av">
+                    <th>ÉLÉMENT</th><th>DIM.</th><th>NB TOTAL</th><th>NB FORÉ</th>
+                    <th>LONGUEUR TOTALE <span class="unit">ml</span></th><th>LONGUEUR FORÉE <span class="unit">ml</span></th><th>% AVANC.</th>
+                  </tr>
+                </thead>
+                <tbody id="tableForageBody"></tbody>
+                <tfoot id="tableForageFoot"></tfoot>
+              </table>
+            </div>
+          </div>
+
         </div>
 
       </div><!-- /left -->

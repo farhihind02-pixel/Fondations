@@ -136,6 +136,7 @@ async function loadData() {
           name:      e.name || '',
           elementType: 'PI',
           famille:   e.famille || 'Pieu',
+          subType:   e.subType  || '—',
           zone:      String(e.zone || '').trim(),
           bloc:      getBlocFromZone(String(e.zone || '').trim()),
           direction: String(e.direction || '').trim().toUpperCase(),
@@ -213,17 +214,6 @@ function populateFilters() {
     zones.map(z => `<label class="f-item"><input type="checkbox" value="${z}" onchange="syncSelectAll('menuZone')"> Zone ${z}</label>`).join('')
   );
 
-  // Directions
-  const dirs = [...new Set(allElements.map(e => e.direction).filter(Boolean))].sort();
-  document.getElementById('menuDirection').innerHTML = buildMenu('menuDirection',
-    dirs.map(d => `<label class="f-item"><input type="checkbox" value="${d}" onchange="syncSelectAll('menuDirection')"> ${DIR_LABELS[d] || d}</label>`).join('')
-  );
-
-  // Types de pieu
-  const types = [...new Set(allElements.map(e => e.famille).filter(Boolean))].sort(naturalSort);
-  document.getElementById('menuType').innerHTML = buildMenu('menuType',
-    types.map(t => `<label class="f-item"><input type="checkbox" value="${t}" onchange="syncSelectAll('menuType')"> ${t}</label>`).join('')
-  );
 }
 
 function getCheckedValues(menuId) {
@@ -244,24 +234,21 @@ function updateBadge(badgeId, values) {
 
 function applyFilters() {
   const zones = getCheckedValues('menuZone');
-  const dirs  = getCheckedValues('menuDirection');
-  const types = getCheckedValues('menuType');
+
   const etats = getCheckedValues('menuEtat');
 
   updateBadge('badgeZone',      zones);
-  updateBadge('badgeDirection', dirs);
-  updateBadge('badgeType',      types);
+
   updateBadge('badgeEtat',      etats);
 
   filteredElements = allElements.filter(e => {
     const okZone = zones.length === 0 || zones.includes(e.zone);
-    const okDir  = dirs.length  === 0 || dirs.includes(e.direction);
-    const okType = types.length === 0 || types.includes(e.famille);
+
     const okEtat = etats.length === 0 || (
       (etats.includes('betonne') && e.betonne === 1) ||
       (etats.includes('fore')    && e.fore    === 1)
     );
-    return okZone && okDir && okType && okEtat;
+    return okZone && okEtat;
   });
 
   refresh();
@@ -270,7 +257,7 @@ function applyFilters() {
 
 function resetFilters() {
   document.querySelectorAll('.f-menu input[type="checkbox"]').forEach(cb => cb.checked = false);
-  ['badgeZone','badgeDirection','badgeType','badgeEtat'].forEach(id => {
+  ['badgeZone','badgeEtat'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.textContent = ''; el.classList.remove('visible'); }
   });
@@ -290,13 +277,13 @@ function refresh() {
 
 // ── KPIs ──────────────────────────────────────────────────
 function updateKPIs() {
-  // Nombre de pieux = éléments avec ME_ELEMENT TYPE === 'PI'
+  // Profondeur totale = somme de ME_LENGTH de tous les pieux filtrés
   const pieux  = filteredElements.filter(e => e.elementType === 'PI');
-  const pCount = pieux.length;
+  const pLen   = sum(pieux, 'length');
   const pVol   = sum(pieux, 'volume');
 
-  document.getElementById('kpiPieuxCount').textContent  = pCount.toLocaleString('fr-FR');
-  document.getElementById('kpiPieuxVolume').textContent = `${fmt(pVol)} m³`;
+  document.getElementById('kpiPieuxCount').textContent  = fmt(pLen);
+  document.getElementById('kpiPieuxVolume').textContent = `${pieux.length.toLocaleString('fr-FR')} pieux`;
   document.getElementById('kpiTotalCount').textContent  = fmt(pVol);
   document.getElementById('kpiTotalVolume').textContent = 'm³';
 
@@ -306,17 +293,22 @@ function updateKPIs() {
   const bCount   = betonnes.length;
   const bVol     = sum(betonnes, 'volume');
 
-  document.getElementById('kpiBetonne').textContent       = bCount.toLocaleString('fr-FR');
-  document.getElementById('kpiBetonneVolume').textContent  = `${fmt(bVol)} m³`;
+  document.getElementById('kpiBetonne').textContent       = fmt(bVol);
+  document.getElementById('kpiBetonneVolume').textContent  = bCount.toLocaleString('fr-FR') + ' éléments bétonnés';
 
 
-  // FORÉS = éléments avec OOP_FORE === 1
-  const fores  = filteredElements.filter(e => e.fore === 1);
-  const fCount = fores.length;
-  const fLen   = sum(fores, 'length');
+  // PROFONDEUR FORÉE = bétonnés (car bétonné => foré avant) + forés, sans doublon
+  const fores    = filteredElements.filter(e => e.fore === 1);
+  const fCount   = fores.length;
+  // Union sans doublon : éléments forés OU bétonnés
+  const foreIds  = new Set(fores.map(e => e.dbId));
+  const unionFB  = filteredElements.filter(e => e.fore === 1 || e.betonne === 1);
+  const unionIds = new Set(unionFB.map(e => e.dbId));
+  const profFore = sum(unionFB, 'length');
+  const unionCount = unionFB.length;
 
-  document.getElementById('kpiFore').textContent       = fCount.toLocaleString('fr-FR');
-  document.getElementById('kpiForeLength').textContent  = `${fmt(fLen)} ml`;
+  document.getElementById('kpiFore').textContent       = fmt(profFore) + ' ml';
+  document.getElementById('kpiForeLength').textContent = unionCount.toLocaleString('fr-FR') + ' éléments (forés + bétonnés)';
 
 }
 
@@ -403,39 +395,100 @@ function updateCharts() {
 
 }
 
-// ── TABLE ─────────────────────────────────────────────────
+// ── TABLE AVANCEMENT ──────────────────────────────────────
 function updateTable() {
-  // Grouper par Zone + Type : une ligne par combinaison
+  // Grouper par OOP_Type + ME_ELEMENT SUB TYPE (Dim)
+  // Chaque groupe = une ligne dans le tableau
   const groups = {};
 
+  // On utilise allElements pour NB TOTAL (tous les pieux de ce type)
+  // et filteredElements pour NB RÉALISÉ / FORÉ (selon filtre Etat)
+  // Tout basé sur filteredElements — réagit aux filtres Zone et Etat
   filteredElements.forEach(e => {
-    const zone = e.zone   || '—';
-    const type = e.famille || 'Pieu';
-    const k    = zone + '__' + type;
-    if (!groups[k]) groups[k] = { zone, type, count: 0, volume: 0, betonne: 0, fore: 0 };
-    groups[k].count   += 1;
-    groups[k].volume  += e.volume || 0;
-    groups[k].betonne += e.betonne === 1 ? 1 : 0;
-    groups[k].fore    += e.fore    === 1 ? 1 : 0;
+    const element = e.famille || 'Pieux';
+    const dim     = e.subType || '—';
+    const k       = dim;
+    if (!groups[k]) groups[k] = {
+      element, dim,
+      total: 0,      volumeTotal: 0,  lengthTotal: 0,
+      coule: 0,      volumeCoule: 0,
+      fore:  0,      lengthFore:  0,
+    };
+    groups[k].total       += 1;
+    groups[k].volumeTotal += e.volume || 0;
+    groups[k].lengthTotal += e.length || 0;
+    if (e.betonne === 1) {
+      groups[k].coule       += 1;
+      groups[k].volumeCoule += e.volume || 0;
+    }
+    // NB FORÉ = foré OU bétonné (car bétonné implique foré préalable)
+    if (e.fore === 1 || e.betonne === 1) {
+      groups[k].fore       += 1;
+      groups[k].lengthFore += e.length || 0;
+    }
   });
 
-  // Trier par zone (numérique) puis type
-  const rows = Object.values(groups).sort((a, b) => {
-    const zc = a.zone.localeCompare(b.zone, 'fr', { numeric: true });
-    return zc !== 0 ? zc : a.type.localeCompare(b.type);
-  });
+  const rows = Object.values(groups).sort((a, b) => a.dim.localeCompare(b.dim, 'fr', { numeric: true }));
 
-  document.getElementById('detailTableBody').innerHTML = rows.map(g => {
-    const pct = g.count ? Math.round(g.betonne / g.count * 100) : 0;
+  // ── TABLEAU COULAGE ────────────────────────────────────
+  let totalC = 0, totalCoule = 0, totalVolT = 0, totalVolC = 0;
+  document.getElementById('tableCoulageBody').innerHTML = rows.map(g => {
+    const pct = g.total ? Math.round(g.coule / g.total * 100) : 0;
+    totalC     += g.total;
+    totalCoule += g.coule;
+    totalVolT  += g.volumeTotal;
+    totalVolC  += g.volumeCoule;
     return '<tr>' +
-      '<td><span class="badge-zone">Zone ' + g.zone + '</span></td>' +
-      '<td>' + g.count.toLocaleString('fr-FR') + '</td>' +
-      '<td>' + fmt(g.volume) + '</td>' +
-      '<td class="td-orange">' + g.betonne + '</td>' +
-      '<td class="td-navy">' + g.fore + '</td>' +
+      '<td class="td-elem">' + g.element + '</td>' +
+      '<td class="td-dim">' + g.dim + '</td>' +
+      '<td>' + g.total + '</td>' +
+      '<td class="td-orange">' + g.coule + '</td>' +
+      '<td>' + fmt(g.volumeTotal) + '</td>' +
+      '<td class="td-orange">' + fmt(g.volumeCoule) + '</td>' +
       '<td><div class="pct-inline"><div class="pct-track"><div class="pct-fill-bar" style="width:' + pct + '%"></div></div><span>' + pct + '%</span></div></td>' +
       '</tr>';
   }).join('');
+
+  const pctTotalC = totalC ? Math.round(totalCoule / totalC * 100) : 0;
+  document.getElementById('tableCoulageFoot').innerHTML =
+    '<tr class="tfoot-total">' +
+    '<td colspan="2"><strong>TOTAL PIEUX</strong></td>' +
+    '<td><strong>' + totalC + '</strong></td>' +
+    '<td class="td-orange"><strong>' + totalCoule + '</strong></td>' +
+    '<td><strong>' + fmt(totalVolT) + '</strong></td>' +
+    '<td class="td-orange"><strong>' + fmt(totalVolC) + '</strong></td>' +
+    '<td><strong>' + pctTotalC + '%</strong></td>' +
+    '</tr>';
+
+  // ── TABLEAU FORAGE ─────────────────────────────────────
+  let totalF = 0, totalFore = 0, totalLenT = 0, totalLenF = 0;
+  document.getElementById('tableForageBody').innerHTML = rows.map(g => {
+    const pct = g.total ? Math.round(g.fore / g.total * 100) : 0;
+    totalF    += g.total;
+    totalFore += g.fore;
+    totalLenT += g.lengthTotal;
+    totalLenF += g.lengthFore;
+    return '<tr>' +
+      '<td class="td-elem">' + g.element + '</td>' +
+      '<td class="td-dim">' + g.dim + '</td>' +
+      '<td>' + g.total + '</td>' +
+      '<td class="td-navy">' + g.fore + '</td>' +
+      '<td>' + fmt(g.lengthTotal) + '</td>' +
+      '<td class="td-navy">' + fmt(g.lengthFore) + '</td>' +
+      '<td><div class="pct-inline"><div class="pct-track"><div class="pct-fill-bar" style="background:#1e3a5f;width:' + pct + '%"></div></div><span>' + pct + '%</span></div></td>' +
+      '</tr>';
+  }).join('');
+
+  const pctTotalF = totalF ? Math.round(totalFore / totalF * 100) : 0;
+  document.getElementById('tableForageFoot').innerHTML =
+    '<tr class="tfoot-total">' +
+    '<td colspan="2"><strong>TOTAL PIEUX</strong></td>' +
+    '<td><strong>' + totalF + '</strong></td>' +
+    '<td class="td-navy"><strong>' + totalFore + '</strong></td>' +
+    '<td><strong>' + fmt(totalLenT) + '</strong></td>' +
+    '<td class="td-navy"><strong>' + fmt(totalLenF) + '</strong></td>' +
+    '<td><strong>' + pctTotalF + '%</strong></td>' +
+    '</tr>';
 }
 
 // ── VIEWER ────────────────────────────────────────────────

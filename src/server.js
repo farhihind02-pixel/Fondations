@@ -15,8 +15,8 @@ const {
 } = process.env;
 
 // ── Maquette Fondations ───────────────────────────────────────────────────────
-const VERSION_URN = 'urn:adsk.wipprod:fs.file:vf.0LwmJuH-SAWi2dOPjrIYgA?version=5';
-const VIEWABLE_GUID = 'f84d05f4-bbee-31de-0f8d-8e2feaf49fc0';
+const VERSION_URN = 'urn:adsk.wipprod:fs.file:vf.LDcG20E1R5Ox7FuNAKX9mQ?version=4';
+const VIEWABLE_GUID = '6037ae57-c500-7cd4-09a1-2e713b28a70c'; // TENTE-AV-PIEUX
 const DERIVATIVE_URN = Buffer.from(VERSION_URN).toString('base64')
   .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 
@@ -131,7 +131,8 @@ app.get('/api/properties', async (_req, res) => {
 
     // Find guid — prefer OO_TENT_ACC view
     const metaList = (metaData.data && metaData.data.metadata) || [];
-    let guid = metaList.find(m => m.name === 'OO_TENT_ACC')?.guid
+    let guid = metaList.find(m => m.guid === VIEWABLE_GUID)?.guid
+            || metaList.find(m => m.name === 'TENTE-AV-PIEUX')?.guid
             || metaList.find(m => m.role === '3d')?.guid
             || metaList[0]?.guid
             || VIEWABLE_GUID;
@@ -309,6 +310,66 @@ app.get('/api/acc-status', async (_req, res) => {
 // ── Start ─────────────────────────────────────────────────────────────────────
 app.get(/^(?!\/api).*$/, (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+
+
+// ── DIAGNOSTIC : liste toutes les vues disponibles ────────
+app.get('/api/list-views', async (_req, res) => {
+  try {
+    const token = await getValidToken();
+    const metaResp = await fetch(
+      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const metaData = await metaResp.json();
+    res.json(metaData);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+
+// ── DEBUG : liste les forés avec leur ME_LENGTH ───────────
+app.get('/api/debug-fore', async (_req, res) => {
+  try {
+    const token = await getValidToken();
+    const metaResp = await fetch(
+      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const metaData = await metaResp.json();
+    const metaList = (metaData.data && metaData.data.metadata) || [];
+    const guid = metaList.find(m => m.guid === VIEWABLE_GUID)?.guid || metaList.find(m => m.role === '3d')?.guid || metaList[0]?.guid;
+    const propsResp = await fetch(
+      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata/${guid}/properties?forceget=true`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const propsData = await propsResp.json();
+    const collection = propsData.data?.collection || [];
+    function nk(s) { return String(s).replace(/[\s\-_]/g,'').toLowerCase(); }
+    function bp(props) {
+      const m = {};
+      for (const g of Object.values(props||{})) {
+        if (typeof g==='object' && g) for (const [k,v] of Object.entries(g)) m[nk(k)]=v;
+      }
+      return n => m[nk(n)];
+    }
+    function toBool(v) {
+      if (!v) return 0;
+      const s = String(v).trim().toLowerCase();
+      return (s==='yes'||s==='1'||s==='true'||s==='oui') ? 1 : 0;
+    }
+    const fores = [];
+    let totalLen = 0;
+    for (const obj of collection) {
+      const P = bp(obj.properties);
+      if (String(P('ME_ELEMENT TYPE')||'').trim().toUpperCase() !== 'PI') continue;
+      if (!toBool(P('OOP-FORE'))) continue;
+      const rawLen = String(P('ME_LENGTH')||'0').replace(/[^0-9.]/g,'');
+      const length = parseFloat(rawLen) || 0;
+      totalLen += length;
+      fores.push({ id: obj.objectid, name: obj.name, ME_LENGTH_RAW: P('ME_LENGTH'), length });
+    }
+    res.json({ count: fores.length, totalLength: Math.round(totalLen*100)/100, fores: fores.slice(0,20) });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.listen(PORT, () => {

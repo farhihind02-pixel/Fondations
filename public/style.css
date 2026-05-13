@@ -38,6 +38,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   flex-shrink: 0; height: 100vh;
 }
 .brand { display: flex; flex-direction: column; gap: 2px; padding-bottom: 14px; border-bottom: 1px solid var(--dark-border); margin-bottom: 14px; }
+.brand-logo { width: 100%; max-width: 140px; border-radius: 6px; object-fit: contain; margin-bottom: 4px; }
 .brand-name { font-size: 1.25rem; font-weight: 800; color: #fff; letter-spacing: 3px; line-height: 1; }
 .brand-sub { font-size: 0.55rem; color: var(--muted-dark); letter-spacing: 1.2px; text-transform: uppercase; }
 .brand-mod { font-size: 0.65rem; color: var(--orange); font-weight: 600; }
@@ -140,6 +141,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 .kpi-row { display: grid; grid-template-columns: 1fr 1fr 1.3fr 1.3fr; gap: 8px; flex-shrink: 0; }
 .kpi { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
 .kpi-accent { border-left: 3px solid var(--orange); }
+.unit { text-transform: none; font-weight: inherit; }
 .kpi-label { font-size: 0.56rem; font-weight: 700; letter-spacing: 1.1px; color: var(--muted); text-transform: uppercase; }
 .kpi-val { font-size: 1.55rem; font-weight: 800; color: var(--text); line-height: 1.1; }
 .kpi-val.orange { color: var(--orange); }
@@ -170,6 +172,14 @@ th { padding: 8px 10px; text-align: left; font-size: 0.78rem; font-weight: 700; 
 td { padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--text); }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: #fafbfc; }
+.avancement-title { font-size: 1rem; font-weight: 800; color: var(--text); margin-bottom: 8px; letter-spacing: 0.5px; }
+.tbl-avancement { width: 100%; border-collapse: collapse; font-size: 1rem; }
+.tbl-avancement .thead-av th { background: #1a1d23; color: #fff; padding: 8px 10px; font-size: 0.78rem; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; border: none; }
+.tbl-avancement td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.tbl-avancement tbody tr:hover { background: #fafbfc; }
+.tbl-avancement .tfoot-total td { background: #f5f5f5; font-weight: 700; border-top: 2px solid #ddd; border-bottom: none; }
+.td-elem { font-weight: 600; }
+.td-dim  { color: var(--muted); font-size: 0.9rem; }
 .badge-p { background: var(--orange-bg); color: var(--orange); padding: 1px 6px; border-radius: 3px; font-size: 0.65rem; font-weight: 700; }
 .badge-zone { background: #f0f4ff; color: #1e3a5f; padding: 2px 8px; border-radius: 3px; font-weight: 700; white-space: nowrap; }
 .td-orange { color: #FF8C4B; font-weight: 600; }
