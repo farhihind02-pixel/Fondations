@@ -138,13 +138,17 @@ async function loadData() {
           famille:   e.famille || 'Pieu',
           subType:   e.subType  || '—',
           zone:      String(e.zone || '').trim(),
+          subzone:   String(e.subzone || '').trim(),  // ME_ELEMENT SUB ZONE
           bloc:      getBlocFromZone(String(e.zone || '').trim()),
           direction: String(e.direction || '').trim().toUpperCase(),
           volume:    parseFloat(e.volume)  || 0,
           length:    parseFloat(e.length)  || 0,
-          // Forcer la conversion numérique — l'API peut retourner string "1" ou number 1
-          betonne:   Number(e.betonne),
-          fore:      Number(e.fore),
+          betonne:        Number(e.betonne),
+          fore:           Number(e.fore),
+          tgcc:           Number(e.tgcc),
+          betonneEtat:    Number(e.betonneEtat),    // OO-ETAT D'AVENCEMENT 1 = BETONNE
+          etatAvancement: String(e.etatAvancement || '').trim().toUpperCase(),
+          elementZone: String(e.elementZone || '').trim().toUpperCase(),
         }));
     } else throw new Error('fallback');
   } catch {
@@ -208,12 +212,11 @@ function buildMenu(menuId, items) {
 }
 
 function populateFilters() {
-  // Zones
-  const zones = [...new Set(allElements.map(e => e.zone).filter(Boolean))].sort(naturalSort);
+  // ME_ELEMENT SUB ZONE
+  const subzones = [...new Set(allElements.map(e => e.subzone).filter(Boolean))].sort(naturalSort);
   document.getElementById('menuZone').innerHTML = buildMenu('menuZone',
-    zones.map(z => `<label class="f-item"><input type="checkbox" value="${z}" onchange="syncSelectAll('menuZone')"> Zone ${z}</label>`).join('')
+    subzones.map(z => `<label class="f-item"><input type="checkbox" value="${z}" onchange="syncSelectAll('menuZone')"> ${z}</label>`).join('')
   );
-
 }
 
 function getCheckedValues(menuId) {
@@ -234,21 +237,38 @@ function updateBadge(badgeId, values) {
 
 function applyFilters() {
   const zones = getCheckedValues('menuZone');
-
   const etats = getCheckedValues('menuEtat');
+  updateBadge('badgeZone', zones);
+  updateBadge('badgeEtat', etats);
 
-  updateBadge('badgeZone',      zones);
-
-  updateBadge('badgeEtat',      etats);
+  const tgcc  = getCheckedValues('menuTGCC');
+  updateBadge('badgeTGCC', tgcc);
 
   filteredElements = allElements.filter(e => {
-    const okZone = zones.length === 0 || zones.includes(e.zone);
-
+    // Filtre Zone : éléments de la subzone sélectionnée SANS les TGCC
+    const okZone = zones.length === 0 || (zones.includes(e.subzone) && e.tgcc !== 1);
+    // Filtre TGCC : éléments avec TGCC=1 uniquement quand coché
+    const okTGCC = tgcc.length  === 0 || (tgcc.includes('TGCC') && e.tgcc === 1);
+    // Si aucun filtre Zone ni TGCC → tout afficher
+    // Si Zone coché sans TGCC → subzone sans TGCC
+    // Si TGCC coché sans Zone → TGCC seulement
+    // Si les deux cochés → (subzone sans TGCC) OU (TGCC)
+    let okZoneTGCC;
+    if (zones.length === 0 && tgcc.length === 0) {
+      okZoneTGCC = true;
+    } else if (zones.length > 0 && tgcc.length === 0) {
+      okZoneTGCC = zones.includes(e.subzone) && e.tgcc !== 1;
+    } else if (zones.length === 0 && tgcc.length > 0) {
+      okZoneTGCC = e.tgcc === 1;
+    } else {
+      // Les deux cochés : OR entre zone-sans-TGCC et TGCC
+      okZoneTGCC = (zones.includes(e.subzone) && e.tgcc !== 1) || e.tgcc === 1;
+    }
     const okEtat = etats.length === 0 || (
-      (etats.includes('betonne') && e.betonne === 1) ||
-      (etats.includes('fore')    && e.fore    === 1)
+      (etats.includes('BETONNE') && e.betonneEtat === 1) ||
+      (etats.includes('FORE')    && e.etatAvancement === 'FORE')
     );
-    return okZone && okEtat;
+    return okZoneTGCC && okEtat;
   });
 
   refresh();
@@ -257,7 +277,7 @@ function applyFilters() {
 
 function resetFilters() {
   document.querySelectorAll('.f-menu input[type="checkbox"]').forEach(cb => cb.checked = false);
-  ['badgeZone','badgeEtat'].forEach(id => {
+  ['badgeZone','badgeEtat','badgeTGCC'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.textContent = ''; el.classList.remove('visible'); }
   });
@@ -287,9 +307,8 @@ function updateKPIs() {
   document.getElementById('kpiTotalCount').textContent  = fmt(pVol) + ' m³';
   document.getElementById('kpiTotalVolume').textContent = '';
 
-  // BÉTONNÉS = éléments avec OOP_BETONNE === 1
-  // Le serveur retourne betonne = 1 (number) quand OOP_BETONNE vaut 1
-  const betonnes = filteredElements.filter(e => e.betonne === 1);
+  // Volume réalisé = éléments filtrés avec OO-ETAT D'AVENCEMENT 1 = BETONNE
+  const betonnes = filteredElements.filter(e => e.betonneEtat === 1);
   const bCount   = betonnes.length;
   const bVol     = sum(betonnes, 'volume');
 
@@ -297,15 +316,11 @@ function updateKPIs() {
   document.getElementById('kpiBetonneVolume').textContent  = bCount.toLocaleString('fr-FR') + ' éléments bétonnés';
 
 
-  // PROFONDEUR FORÉE = bétonnés (car bétonné => foré avant) + forés, sans doublon
-  const fores    = filteredElements.filter(e => e.fore === 1);
-  const fCount   = fores.length;
-  // Union sans doublon : éléments forés OU bétonnés
-  const foreIds  = new Set(fores.map(e => e.dbId));
-  const unionFB  = filteredElements.filter(e => e.fore === 1 || e.betonne === 1);
-  const unionIds = new Set(unionFB.map(e => e.dbId));
-  const profFore = sum(unionFB, 'length');
-  const unionCount = unionFB.length;
+  // PROFONDEUR FORÉE = ME_LENGTH bétonnés + ME_LENGTH FORE
+  const profBetonne  = sum(filteredElements.filter(e => e.betonneEtat === 1), 'length');
+  const profForeEtat = sum(filteredElements.filter(e => e.etatAvancement === 'FORE'), 'length');
+  const profFore     = profBetonne + profForeEtat;
+  const unionCount   = filteredElements.filter(e => e.betonneEtat === 1 || e.etatAvancement === 'FORE').length;
 
   document.getElementById('kpiFore').textContent       = fmt(profFore) + ' ml';
   document.getElementById('kpiForeLength').textContent = unionCount.toLocaleString('fr-FR') + ' éléments';
@@ -327,41 +342,14 @@ function mkChart(id, type, data, options) {
 }
 
 function updateCharts() {
-  // ── Avancement par Zone : Réalisé vs Total ───────────
-  const byZone = {};
-  filteredElements.forEach(e => {
-    const lbl = e.zone ? `Zone ${e.zone}` : '—';
-    if (!byZone[lbl]) byZone[lbl] = { total: 0, realise: 0 };
-    byZone[lbl].total   += e.volume || 0;
-    if (e.betonne === 1) byZone[lbl].realise += e.volume || 0;
-  });
-  const zoneSorted = Object.keys(byZone).sort((a, b) => a.localeCompare(b,'fr',{numeric:true}));
-  mkChart('chartBloc', 'bar', {
-    labels: zoneSorted,
-    datasets: [
-      { label: 'Réalisé', data: zoneSorted.map(z => byZone[z].realise), backgroundColor: '#ffa017', borderRadius: 5, borderSkipped: false },
-      { label: 'Total',   data: zoneSorted.map(z => byZone[z].total),   backgroundColor: '#9ca3af', borderRadius: 5, borderSkipped: false }
-    ]
-  }, {
-    responsive: true, maintainAspectRatio: false,
-    plugins: {
-      legend: { ...LEG, position: 'bottom' },
-      tooltip: { ...TT, callbacks: { label: ctx => ' ' + fmt(ctx.raw) + ' m³' } }
-    },
-    scales: {
-      x: { grid: { display: false }, ticks: { color: '#6b7280', font: { size: 10 } } },
-      y: { grid: { color: '#f0f0f0' }, ticks: { color: '#6b7280', font: { size: 10 }, callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v } }
-    }
-  });
-
-  // ── Volume bétonné vs total (donut) ────────────────────
+  // ── Volume réalisé vs total (donut) ──────────────────
   const totalVol   = sum(filteredElements, 'volume');
-  const betonneVol = sum(filteredElements.filter(e => e.betonne === 1), 'volume');
+  const betonneVol = sum(filteredElements.filter(e => e.betonneEtat === 1), 'volume');
   const resteVol   = Math.max(0, totalVol - betonneVol);
   const bPct = totalVol ? Math.round(betonneVol / totalVol * 100) : 0;
 
   mkChart('chartBetonnePie', 'doughnut', {
-    labels: [`Bétonné — ${bPct}%`, `Non bétonné — ${100 - bPct}%`],
+    labels: [`Volume réalisé — ${bPct}%`, `Reste — ${100 - bPct}%`],
     datasets: [{
       data: [betonneVol, resteVol],
       backgroundColor: ['#ffa017', '#e5e7eb'],
@@ -421,12 +409,14 @@ function updateTable() {
     groups[k].total       += 1;
     groups[k].volumeTotal += e.volume || 0;
     groups[k].lengthTotal += e.length || 0;
-    if (e.betonne === 1) {
+    // NB RÉALISÉ = OO-ETAT D'AVENCEMENT 1 === BETONNE
+    if (e.betonneEtat === 1) {
       groups[k].coule       += 1;
       groups[k].volumeCoule += e.volume || 0;
     }
-    // NB FORÉ = foré OU bétonné (car bétonné implique foré préalable)
-    if (e.fore === 1 || e.betonne === 1) {
+    // NB FORÉ = foré OU bétonné (OO-ETAT = BETONNE implique foré préalable)
+    // NB FORÉ = betonneEtat=1 OU etatAvancement=FORE (même logique que PROFONDEUR FORÉE)
+    if (e.betonneEtat === 1 || e.etatAvancement === 'FORE') {
       groups[k].fore       += 1;
       groups[k].lengthFore += e.length || 0;
     }
@@ -453,7 +443,7 @@ function updateTable() {
       '</tr>';
   }).join('');
 
-  const pctTotalC = totalC ? Math.round(totalCoule / totalC * 100) : 0;
+  const pctTotalC = totalVolT ? Math.round(totalVolC / totalVolT * 100) : 0;
   document.getElementById('tableCoulageFoot').innerHTML =
     '<tr class="tfoot-total">' +
     '<td colspan="2"><strong>TOTAL PIEUX</strong></td>' +
@@ -467,10 +457,10 @@ function updateTable() {
   // ── TABLEAU FORAGE ─────────────────────────────────────
   let totalF = 0, totalFore = 0, totalLenT = 0, totalLenF = 0;
   document.getElementById('tableForageBody').innerHTML = rows.map(g => {
-    const pct = g.total ? Math.round(g.fore / g.total * 100) : 0;
+    const pct = g.lengthTotal ? Math.round(g.lengthFore / g.lengthTotal * 100) : 0;
     totalF    += g.total;
     totalFore += g.fore;
-    totalLenT += g.lengthTotal;
+    totalLenT += g.lengthTotal;  // LONGUEUR TOTALE = PROFONDEUR TOTALE PIEUX
     totalLenF += g.lengthFore;
     return '<tr>' +
       '<td class="td-elem">' + g.element + '</td>' +
@@ -483,7 +473,7 @@ function updateTable() {
       '</tr>';
   }).join('');
 
-  const pctTotalF = totalF ? Math.round(totalFore / totalF * 100) : 0;
+  const pctTotalF = totalLenT ? Math.round(totalLenF / totalLenT * 100) : 0;
   document.getElementById('tableForageFoot').innerHTML =
     '<tr class="tfoot-total">' +
     '<td colspan="2"><strong>TOTAL PIEUX</strong></td>' +

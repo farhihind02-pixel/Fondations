@@ -15,8 +15,8 @@ const {
 } = process.env;
 
 // ── Maquette Fondations ───────────────────────────────────────────────────────
-const VERSION_URN = 'urn:adsk.wipprod:fs.file:vf.LDcG20E1R5Ox7FuNAKX9mQ?version=4';
-const VIEWABLE_GUID = '6037ae57-c500-7cd4-09a1-2e713b28a70c'; // TENTE-AV-PIEUX
+const VERSION_URN   = 'urn:adsk.wipprod:fs.file:vf.ywYMIhfpRnOfmw10FVM6fQ?version=2';
+const VIEWABLE_GUID = 'c091edfa-33ef-4204-a14c-4fa7518855a4'; // OUZZ
 const DERIVATIVE_URN = Buffer.from(VERSION_URN).toString('base64')
   .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 
@@ -171,6 +171,7 @@ app.get('/api/properties', async (_req, res) => {
     // Convertit "Yes"/"No"/1/0/true/false → 1 ou 0
     function toBool(v) {
       if (v === null || v === undefined || v === '') return 0;
+      if (v === 1 || v === true) return 1;   // number 1 ou boolean true
       const s = String(v).trim().toLowerCase();
       return (s === 'yes' || s === '1' || s === 'true' || s === 'oui') ? 1 : 0;
     }
@@ -191,10 +192,19 @@ app.get('/api/properties', async (_req, res) => {
       // OOP-FORE : "Yes" = foré  (tiret, dans groupe "Autre")
       const fore = toBool(P('OOP-FORE'));
 
+      // TGCC : paramètre booléen — 1 = élément TGCC
+      const tgcc = toBool(P('TGCC'));
+
+      // OO-ETAT D'AVENCEMENT 1 : BETONNE ou FORE
+      const etatAvancement = String(P("OO-ETAT D'AVENCEMENT 1") || P('OO-ETAT DAVENCEMENT 1') || '').trim().toUpperCase();
+      const betonneEtat    = etatAvancement === 'BETONNE' ? 1 : 0;
+
       const famille   = String(P('OOP_Type') || P('OOP_Famille') || typeCode).trim();
       const zone      = String(P('OOP_Zone') || '').trim();
       const direction = String(P('OOF_ZONE') || '').trim().toUpperCase();
-      const subType   = String(P('OOP_Sub Type') || P('ME_ELEMENT SUB TYPE') || '').trim();
+      const subType    = String(P('OOP_Sub Type') || P('ME_ELEMENT SUB TYPE') || '').trim();
+      const subzone    = String(P('ME_ELEMENT SUB ZONE') || P('ME_ELEMENT SUBZONE') || '').trim();
+      const elementZone = String(P('ME_ELEMENT ZONE') || '').trim().toUpperCase(); // TENT ou TGCC
 
       // Volume (ME_VOLUME en m³, uniquement sur les PI)
       const rawVol = String(P('ME_VOLUME') || '').replace(/[^0-9.]/g, '');
@@ -218,10 +228,15 @@ app.get('/api/properties', async (_req, res) => {
         zone,                        // OOP_Zone (ex: "3", "9")
         direction,                   // OOF_ZONE (ex: "SE", "NE")
         subType,                     // ME_ELEMENT SUB TYPE
+        subzone,                     // ME_ELEMENT SUB ZONE
+        elementZone,                 // ME_ELEMENT ZONE (TENT/TGCC)
         volume,                      // m³
         length,                      // ml
         betonne,                     // 1 si OOP-BETONNE = "Yes"
         fore,                        // 1 si OOP-FORE = "Yes"
+        tgcc,                        // 1 si TGCC = 1
+        betonneEtat,                 // 1 si OO-ETAT D'AVENCEMENT 1 = BETONNE
+        etatAvancement,              // valeur brute : BETONNE / FORE / ...
         elevBase,
         elevHaut,
       });
@@ -369,6 +384,92 @@ app.get('/api/debug-fore', async (_req, res) => {
       fores.push({ id: obj.objectid, name: obj.name, ME_LENGTH_RAW: P('ME_LENGTH'), length });
     }
     res.json({ count: fores.length, totalLength: Math.round(totalLen*100)/100, fores: fores.slice(0,20) });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+
+// ── DEBUG : propriétés complètes d'un PI ─────────────────
+app.get('/api/debug-pi', async (_req, res) => {
+  try {
+    const token = await getValidToken();
+    const metaResp = await fetch(
+      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const metaData = await metaResp.json();
+    const metaList = (metaData.data && metaData.data.metadata) || [];
+    const guid = metaList.find(m => m.guid === VIEWABLE_GUID)?.guid
+              || metaList.find(m => m.role === '3d')?.guid
+              || metaList[0]?.guid;
+    const propsResp = await fetch(
+      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata/${guid}/properties?forceget=true`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const propsData = await propsResp.json();
+    const collection = propsData.data?.collection || [];
+    function nk(s) { return String(s).replace(/[\s\-_]/g,'').toLowerCase(); }
+    function bp(props) {
+      const m = {};
+      for (const g of Object.values(props||{})) {
+        if (typeof g==='object' && g) for (const [k,v] of Object.entries(g)) m[nk(k)]=v;
+      }
+      return n => m[nk(n)];
+    }
+    // Trouver le premier PI et retourner TOUTES ses propriétés
+    const pi = collection.find(o => {
+      const P = bp(o.properties);
+      return String(P('ME_ELEMENT TYPE')||'').trim().toUpperCase() === 'PI';
+    });
+    if (!pi) return res.json({ error: 'Aucun PI trouvé' });
+    res.json({ objectid: pi.objectid, name: pi.name, properties: pi.properties });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+
+// ── DEBUG : liste les subzones disponibles ───────────────
+app.get('/api/debug-subzones', async (_req, res) => {
+  try {
+    const token = await getValidToken();
+    const metaResp = await fetch(
+      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const metaData = await metaResp.json();
+    const metaList = (metaData.data && metaData.data.metadata) || [];
+    const guid = metaList.find(m => m.guid === VIEWABLE_GUID)?.guid
+              || metaList.find(m => m.role === '3d')?.guid
+              || metaList[0]?.guid;
+    const propsResp = await fetch(
+      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata/${guid}/properties?forceget=true`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const propsData = await propsResp.json();
+    const collection = propsData.data?.collection || [];
+    function nk(s) { return String(s).replace(/[\s\-_]/g,'').toLowerCase(); }
+    function bp(props) {
+      const m = {};
+      for (const g of Object.values(props||{})) {
+        if (typeof g==='object' && g) for (const [k,v] of Object.entries(g)) m[nk(k)]=v;
+      }
+      return n => m[nk(n)];
+    }
+    const stats = {};
+    let totalVol = 0;
+    for (const obj of collection) {
+      const P = bp(obj.properties);
+      if (String(P('ME_ELEMENT TYPE')||'').trim().toUpperCase() !== 'PI') continue;
+      const subzone = String(P('ME_ELEMENT SUB ZONE')||'').trim();
+      const tgcc = P('TGCC');
+      const rawVol = String(P('ME_VOLUME')||'').replace(/[^0-9.]/g,'');
+      const vol = parseFloat(rawVol) || 0;
+      totalVol += vol;
+      const key = subzone || '(vide)';
+      if (!stats[key]) stats[key] = { count: 0, volume: 0, tgccCount: 0 };
+      stats[key].count++;
+      stats[key].volume += vol;
+      if (tgcc === 1 || tgcc === '1' || tgcc === true) stats[key].tgccCount++;
+    }
+    res.json({ totalVolume: Math.round(totalVol*100)/100, subzones: stats });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
