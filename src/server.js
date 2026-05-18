@@ -15,8 +15,8 @@ const {
 } = process.env;
 
 // ── Maquette Fondations ───────────────────────────────────────────────────────
-const VERSION_URN   = 'urn:adsk.wipprod:fs.file:vf.ywYMIhfpRnOfmw10FVM6fQ?version=2';
-const VIEWABLE_GUID = 'c091edfa-33ef-4204-a14c-4fa7518855a4'; // OUZZ
+const VERSION_URN   = 'urn:adsk.wipprod:fs.file:vf.-mrMUC7JRnCtJxrmRwv7pw?version=3';
+const VIEWABLE_GUID = 'b69c4a84-4242-40b1-79b9-5eb975d04b35';
 const DERIVATIVE_URN = Buffer.from(VERSION_URN).toString('base64')
   .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 
