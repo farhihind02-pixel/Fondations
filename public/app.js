@@ -146,6 +146,7 @@ async function loadData() {
           betonne:        Number(e.betonne),
           fore:           Number(e.fore),
           tgcc:           Number(e.tgcc),
+          zoneTrv:        String(e.zoneTrv || '').trim(),
           betonneEtat:    Number(e.betonneEtat),    // OO-ETAT D'AVENCEMENT 1 = BETONNE
           etatAvancement: String(e.etatAvancement || '').trim().toUpperCase(),
           elementZone: String(e.elementZone || '').trim().toUpperCase(),
@@ -241,8 +242,8 @@ function applyFilters() {
   updateBadge('badgeZone', zones);
   updateBadge('badgeEtat', etats);
 
-  const tgcc  = getCheckedValues('menuTGCC');
-  updateBadge('badgeTGCC', tgcc);
+  const tgcc     = getCheckedValues('menuTGCC');
+  updateBadge('badgeTGCC',    tgcc);
 
   filteredElements = allElements.filter(e => {
     // Filtre Zone : éléments de la subzone sélectionnée SANS les TGCC
@@ -261,7 +262,6 @@ function applyFilters() {
     } else if (zones.length === 0 && tgcc.length > 0) {
       okZoneTGCC = e.tgcc === 1;
     } else {
-      // Les deux cochés : OR entre zone-sans-TGCC et TGCC
       okZoneTGCC = (zones.includes(e.subzone) && e.tgcc !== 1) || e.tgcc === 1;
     }
     const okEtat = etats.length === 0 || (

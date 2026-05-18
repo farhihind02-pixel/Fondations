@@ -15,8 +15,8 @@ const {
 } = process.env;
 
 // ── Maquette Fondations ───────────────────────────────────────────────────────
-const VERSION_URN   = 'urn:adsk.wipprod:fs.file:vf.-mrMUC7JRnCtJxrmRwv7pw?version=3';
-const VIEWABLE_GUID = 'b69c4a84-4242-40b1-79b9-5eb975d04b35';
+const VERSION_URN   = 'urn:adsk.wipprod:fs.file:vf.znvssgeQQueLFCaXw2MP8g?version=3';
+const VIEWABLE_GUID = 'de17a352-4300-0b5d-4cde-d83350c8919b';
 const DERIVATIVE_URN = Buffer.from(VERSION_URN).toString('base64')
   .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 
@@ -195,6 +195,10 @@ app.get('/api/properties', async (_req, res) => {
       // TGCC : paramètre booléen — 1 = élément TGCC
       const tgcc = toBool(P('TGCC'));
 
+      // OOT-ZONE DE TRV : Yes/No → 'Oui'/'Non'
+      const rawZoneTrv = String(P('OOT-ZONE DE TRV') || P('OOT_ZONE DE TRV') || '').trim().toLowerCase();
+      const zoneTrv    = rawZoneTrv === 'yes' || rawZoneTrv === '1' || rawZoneTrv === 'oui' ? 'Oui' : rawZoneTrv === 'no' || rawZoneTrv === '0' || rawZoneTrv === 'non' ? 'Non' : '';
+
       // OO-ETAT D'AVENCEMENT 1 : BETONNE ou FORE
       const etatAvancement = String(P("OO-ETAT D'AVENCEMENT 1") || P('OO-ETAT DAVENCEMENT 1') || '').trim().toUpperCase();
       const betonneEtat    = etatAvancement === 'BETONNE' ? 1 : 0;
@@ -235,6 +239,7 @@ app.get('/api/properties', async (_req, res) => {
         betonne,                     // 1 si OOP-BETONNE = "Yes"
         fore,                        // 1 si OOP-FORE = "Yes"
         tgcc,                        // 1 si TGCC = 1
+        zoneTrv,                     // OOT-ZONE DE TRV : Oui/Non
         betonneEtat,                 // 1 si OO-ETAT D'AVENCEMENT 1 = BETONNE
         etatAvancement,              // valeur brute : BETONNE / FORE / ...
         elevBase,
