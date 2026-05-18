@@ -363,6 +363,27 @@ function updateCharts() {
     }
   });
 
+  // ── Profondeur forée vs total (donut) ─────────────────
+  const profTotale   = sum(filteredElements, 'length');
+  const profForee    = sum(filteredElements.filter(e => e.betonneEtat === 1 || e.etatAvancement === 'FORE'), 'length');
+  const profReste    = Math.max(0, profTotale - profForee);
+  const fPct         = profTotale ? Math.round(profForee / profTotale * 100) : 0;
+
+  mkChart('chartForePie', 'doughnut', {
+    labels: [`Profondeur forée — ${fPct}%`, `Reste — ${100 - fPct}%`],
+    datasets: [{
+      data: [profForee, profReste],
+      backgroundColor: ['#1e3a5f', '#e5e7eb'],
+      borderWidth: 3, borderColor: '#fff', hoverOffset: 4,
+    }]
+  }, {
+    responsive: true, maintainAspectRatio: false, cutout: '65%',
+    plugins: {
+      legend: { ...LEG, position: 'right' },
+      tooltip: { ...TT, callbacks: { label: ctx => ` ${fmt(ctx.raw)} ml` } }
+    }
+  });
+
   // ── Mini donut bétonnés (KPI) ──────────────────────────
   const bN  = filteredElements.filter(e => e.betonne === 1).length;
   const nbN = filteredElements.length - bN;
@@ -427,7 +448,8 @@ function updateTable() {
   // ── TABLEAU COULAGE ────────────────────────────────────
   let totalC = 0, totalCoule = 0, totalVolT = 0, totalVolC = 0;
   document.getElementById('tableCoulageBody').innerHTML = rows.map(g => {
-    const pct = g.total ? Math.round(g.coule / g.total * 100) : 0;
+    const TOTAL_PIEUX_FIXE = 491;
+    const pct = Math.round(g.coule / TOTAL_PIEUX_FIXE * 100);
     totalC     += g.total;
     totalCoule += g.coule;
     totalVolT  += g.volumeTotal;
@@ -443,7 +465,8 @@ function updateTable() {
       '</tr>';
   }).join('');
 
-  const pctTotalC = totalVolT ? Math.round(totalVolC / totalVolT * 100) : 0;
+  const TOTAL_PIEUX_FIXE = 491;
+  const pctTotalC = Math.round(totalCoule / TOTAL_PIEUX_FIXE * 100);
   document.getElementById('tableCoulageFoot').innerHTML =
     '<tr class="tfoot-total">' +
     '<td colspan="2"><strong>TOTAL PIEUX</strong></td>' +
@@ -457,7 +480,7 @@ function updateTable() {
   // ── TABLEAU FORAGE ─────────────────────────────────────
   let totalF = 0, totalFore = 0, totalLenT = 0, totalLenF = 0;
   document.getElementById('tableForageBody').innerHTML = rows.map(g => {
-    const pct = g.lengthTotal ? Math.round(g.lengthFore / g.lengthTotal * 100) : 0;
+    const pct = Math.round(g.fore / 491 * 100);
     totalF    += g.total;
     totalFore += g.fore;
     totalLenT += g.lengthTotal;  // LONGUEUR TOTALE = PROFONDEUR TOTALE PIEUX
@@ -473,7 +496,7 @@ function updateTable() {
       '</tr>';
   }).join('');
 
-  const pctTotalF = totalLenT ? Math.round(totalLenF / totalLenT * 100) : 0;
+  const pctTotalF = Math.round(totalFore / 491 * 100);
   document.getElementById('tableForageFoot').innerHTML =
     '<tr class="tfoot-total">' +
     '<td colspan="2"><strong>TOTAL PIEUX</strong></td>' +
