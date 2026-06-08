@@ -14,15 +14,13 @@ const {
   PORT = 3000,
 } = process.env;
 
-// ── Maquette Fondations ───────────────────────────────────────────────────────
-const VERSION_URN   = 'urn:adsk.wipprod:fs.file:vf.znvssgeQQueLFCaXw2MP8g?version=3';
-const VIEWABLE_GUID = 'de17a352-4300-0b5d-4cde-d83350c8919b';
+const VERSION_URN    = 'urn:adsk.wipprod:fs.file:vf.95ZduzNQSfeN7oYyHNaaPw?version=3';
+const VIEWABLE_GUID  = '9bb67878-f427-1d63-5216-0512fd14651a';
 const DERIVATIVE_URN = Buffer.from(VERSION_URN).toString('base64')
   .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 
 console.log('[Config] URN:', DERIVATIVE_URN);
 
-// ── Session ───────────────────────────────────────────────────────────────────
 let session = { token: null, refreshToken: null, expiresAt: 0 };
 
 async function getValidToken() {
@@ -32,20 +30,13 @@ async function getValidToken() {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        grant_type:    'refresh_token',
-        refresh_token: session.refreshToken,
-        client_id:     APS_CLIENT_ID,
-        client_secret: APS_CLIENT_SECRET,
+        grant_type: 'refresh_token', refresh_token: session.refreshToken,
+        client_id: APS_CLIENT_ID, client_secret: APS_CLIENT_SECRET,
       }),
     });
     if (resp.ok) {
       const data = await resp.json();
-      session = {
-        token:        data.access_token,
-        refreshToken: data.refresh_token || session.refreshToken,
-        expiresAt:    Date.now() + (data.expires_in - 60) * 1000,
-      };
-      console.log('[Auth] Token rafraîchi ✓');
+      session = { token: data.access_token, refreshToken: data.refresh_token || session.refreshToken, expiresAt: Date.now() + (data.expires_in - 60) * 1000 };
       return session.token;
     }
     session = { token: null, refreshToken: null, expiresAt: 0 };
@@ -53,16 +44,13 @@ async function getValidToken() {
   throw new Error('NON_AUTHENTIFIE');
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// AUTH
-// ══════════════════════════════════════════════════════════════════════════════
-
+// ── AUTH ──────────────────────────────────────────────────────────────────────
 app.get('/api/auth/login', (_req, res) => {
   const url = new URL('https://developer.api.autodesk.com/authentication/v2/authorize');
   url.searchParams.set('response_type', 'code');
-  url.searchParams.set('client_id',     APS_CLIENT_ID);
-  url.searchParams.set('redirect_uri',  APS_CALLBACK_URL);
-  url.searchParams.set('scope',         'data:read viewables:read');
+  url.searchParams.set('client_id',    APS_CLIENT_ID);
+  url.searchParams.set('redirect_uri', APS_CALLBACK_URL);
+  url.searchParams.set('scope',        'data:read viewables:read');
   res.redirect(url.toString());
 });
 
@@ -73,35 +61,18 @@ app.get('/api/auth/callback', async (req, res) => {
     const resp = await fetch('https://developer.api.autodesk.com/authentication/v2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type:    'authorization_code',
-        code,
-        client_id:     APS_CLIENT_ID,
-        client_secret: APS_CLIENT_SECRET,
-        redirect_uri:  APS_CALLBACK_URL,
-      }),
+      body: new URLSearchParams({ grant_type: 'authorization_code', code, client_id: APS_CLIENT_ID, client_secret: APS_CLIENT_SECRET, redirect_uri: APS_CALLBACK_URL }),
     });
-    if (!resp.ok) throw new Error(`${resp.status} — ${await resp.text()}`);
+    if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
-    session = {
-      token:        data.access_token,
-      refreshToken: data.refresh_token,
-      expiresAt:    Date.now() + (data.expires_in - 60) * 1000,
-    };
-    console.log('[Auth] Connecté ✓');
+    session = { token: data.access_token, refreshToken: data.refresh_token, expiresAt: Date.now() + (data.expires_in - 60) * 1000 };
     res.redirect('/');
-  } catch (err) {
-    res.redirect('/?error=' + encodeURIComponent(err.message));
-  }
+  } catch (err) { res.redirect('/?error=' + encodeURIComponent(err.message)); }
 });
 
 app.get('/api/auth/status', (_req, res) => {
   res.json({ connected: !!(session.token && Date.now() < session.expiresAt + 3600000) });
 });
-
-// ══════════════════════════════════════════════════════════════════════════════
-// API
-// ══════════════════════════════════════════════════════════════════════════════
 
 app.get('/api/token', async (_req, res) => {
   try { res.json({ access_token: await getValidToken(), expires_in: 3600 }); }
@@ -112,228 +83,168 @@ app.get('/api/model-urn', (_req, res) => {
   res.json({ urn: DERIVATIVE_URN, viewableGuid: VIEWABLE_GUID });
 });
 
-app.get('/api/properties', async (_req, res) => {
-  try {
-    const token = await getValidToken();
-
-    // Step 1: Get metadata list to find the correct model GUID
-    const metaResp = await fetch(
-      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    if (!metaResp.ok) {
-      const txt = await metaResp.text();
-      console.log('[Properties] Metadata error:', metaResp.status, txt.slice(0,200));
-      return res.status(metaResp.status).json({ error: `Metadata inaccessible: ${metaResp.status}` });
-    }
-    const metaData = await metaResp.json();
-    console.log('[Properties] Metadata:', JSON.stringify(metaData).slice(0,300));
-
-    // Find guid — prefer OO_TENT_ACC view
-    const metaList = (metaData.data && metaData.data.metadata) || [];
-    let guid = metaList.find(m => m.guid === VIEWABLE_GUID)?.guid
-            || metaList.find(m => m.name === 'TENTE-AV-PIEUX')?.guid
+// ── Helper commun pour récupérer les propriétés ───────────────────────────────
+async function fetchProps(token) {
+  const metaResp = await fetch(
+    `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!metaResp.ok) throw new Error(`Metadata: ${metaResp.status}`);
+  const metaData = await metaResp.json();
+  const metaList = (metaData.data && metaData.data.metadata) || [];
+  const guid = metaList.find(m => m.guid === VIEWABLE_GUID)?.guid
             || metaList.find(m => m.role === '3d')?.guid
             || metaList[0]?.guid
             || VIEWABLE_GUID;
+  const propsResp = await fetch(
+    `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata/${guid}/properties?forceget=true`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!propsResp.ok) throw new Error(`Properties: ${propsResp.status}`);
+  const propsData = await propsResp.json();
+  return { collection: (propsData.data && propsData.data.collection) || [], guid };
+}
 
-    console.log('[Properties] Using guid:', guid);
+function normKey(s) { return String(s).replace(/[\s\-_]/g, '').toLowerCase(); }
+function buildPropMap(properties) {
+  const map = {};
+  for (const group of Object.values(properties || {})) {
+    if (typeof group !== 'object' || group === null) continue;
+    for (const [k, v] of Object.entries(group)) map[normKey(k)] = v;
+  }
+  return (name) => map[normKey(name)];
+}
+function toBool(v) {
+  if (v === null || v === undefined || v === '') return 0;
+  if (v === 1 || v === true) return 1;
+  const s = String(v).trim().toLowerCase();
+  return (s === 'yes' || s === '1' || s === 'true' || s === 'oui') ? 1 : 0;
+}
 
-    // Step 2: Properties
-    const propsResp = await fetch(
-      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata/${guid}/properties?forceget=true`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    if (!propsResp.ok) {
-      const txt = await propsResp.text();
-      console.log('[Properties] Props error:', propsResp.status, txt.slice(0,200));
-      return res.status(propsResp.status).json({ error: `Properties inaccessibles: ${propsResp.status}` });
-    }
-
-    const propsData  = await propsResp.json();
-    const collection = (propsData.data && propsData.data.collection) || [];
-    const elements   = [];
-
-    // ─────────────────────────────────────────────────────────
-    // Lecture insensible à la casse, tirets, underscores, espaces
-    // Exemples : "OOP-BETONNE", "OOP_Betonne", "OOP BETONNE" → tous trouvés
-    // ─────────────────────────────────────────────────────────
-    function normKey(s) { return String(s).replace(/[\s\-_]/g, '').toLowerCase(); }
-    function buildPropMap(properties) {
-      const map = {};
-      for (const group of Object.values(properties || {})) {
-        if (typeof group !== 'object' || group === null) continue;
-        for (const [k, v] of Object.entries(group)) { map[normKey(k)] = v; }
-      }
-      return (name) => map[normKey(name)];
-    }
-
-    // Convertit "Yes"/"No"/1/0/true/false → 1 ou 0
-    function toBool(v) {
-      if (v === null || v === undefined || v === '') return 0;
-      if (v === 1 || v === true) return 1;   // number 1 ou boolean true
-      const s = String(v).trim().toLowerCase();
-      return (s === 'yes' || s === '1' || s === 'true' || s === 'oui') ? 1 : 0;
-    }
-
+// ── /api/properties ───────────────────────────────────────────────────────────
+app.get('/api/properties', async (_req, res) => {
+  try {
+    const token = await getValidToken();
+    const { collection } = await fetchProps(token);
+    const elements = [];
     for (const obj of collection) {
       const P = buildPropMap(obj.properties);
-
-      // ME_ELEMENT TYPE : PI = pieux, SI = semelles
       const typeCode = String(P('ME_ELEMENT TYPE') || '').trim().toUpperCase();
       if (typeCode !== 'PI' && typeCode !== 'SI') continue;
-
-      // Garder toutes les instances PI (y compris celles sans crochet dans le nom)
-      // Les définitions de type Revit pures n'ont pas ME_ELEMENT TYPE = PI donc déjà exclues
-
-      // OOP-BETONNE : "Yes" = bétonné  (tiret, dans groupe "Autre")
-      const betonne = toBool(P('OOP-BETONNE'));
-
-      // OOP-FORE : "Yes" = foré  (tiret, dans groupe "Autre")
-      const fore = toBool(P('OOP-FORE'));
-
-      // TGCC : paramètre booléen — 1 = élément TGCC
-      const tgcc = toBool(P('TGCC'));
-
-      // OOT-ZONE DE TRV : Yes/No → 'Oui'/'Non'
-      const rawZoneTrv = String(P('OOT-ZONE DE TRV') || P('OOT_ZONE DE TRV') || '').trim().toLowerCase();
-      const zoneTrv    = rawZoneTrv === 'yes' || rawZoneTrv === '1' || rawZoneTrv === 'oui' ? 'Oui' : rawZoneTrv === 'no' || rawZoneTrv === '0' || rawZoneTrv === 'non' ? 'Non' : '';
-
-      // OO-ETAT D'AVENCEMENT 1 : BETONNE ou FORE
       const etatAvancement = String(P("OO-ETAT D'AVENCEMENT 1") || P('OO-ETAT DAVENCEMENT 1') || '').trim().toUpperCase();
-      const betonneEtat    = etatAvancement === 'BETONNE' ? 1 : 0;
-
-      const famille   = String(P('OOP_Type') || P('OOP_Famille') || typeCode).trim();
-      const zone      = String(P('OOP_Zone') || '').trim();
-      const direction = String(P('OOF_ZONE') || '').trim().toUpperCase();
-      const subType    = String(P('OOP_Sub Type') || P('ME_ELEMENT SUB TYPE') || '').trim();
-      const subzone    = String(P('ME_ELEMENT SUB ZONE') || P('ME_ELEMENT SUBZONE') || '').trim();
-      const elementZone = String(P('ME_ELEMENT ZONE') || '').trim().toUpperCase(); // TENT ou TGCC
-
-      // Volume (ME_VOLUME en m³, uniquement sur les PI)
-      const rawVol = String(P('ME_VOLUME') || '').replace(/[^0-9.]/g, '');
-      const volume = Math.round((parseFloat(rawVol) || 0) * 100) / 100;
-
-      // Longueur (ME_LENGTH en m, ex : "18.000 m" → 18)
-      const rawLen = String(P('ME_LENGTH') || '').replace(/[^0-9.]/g, '');
-      const length = parseFloat(rawLen) || 0;
-
-      // Élévations
-      const rawEB = String(P('Elevation a la base') || P('Elevation base') || '0').replace(/[^0-9.\-]/g, '');
-      const rawEH = String(P('Elevation en haut')   || P('Elevation haut') || '0').replace(/[^0-9.\-]/g, '');
-      const elevBase = parseFloat(rawEB) || 0;
-      const elevHaut = parseFloat(rawEH) || 0;
-
+      const rawZoneTrv = String(P('OOT-ZONE DE TRV') || P('OOT_ZONE DE TRV') || '').trim().toLowerCase();
       elements.push({
         dbId:        obj.objectid,
         name:        obj.name || '',
-        elementType: typeCode,       // 'PI' ou 'SI'
-        famille,                     // OOP_Type (ex: "PIEUX", "SI-A")
-        zone,                        // OOP_Zone (ex: "3", "9")
-        direction,                   // OOF_ZONE (ex: "SE", "NE")
-        subType,                     // ME_ELEMENT SUB TYPE
-        subzone,                     // ME_ELEMENT SUB ZONE
-        elementZone,                 // ME_ELEMENT ZONE (TENT/TGCC)
-        volume,                      // m³
-        length,                      // ml
-        betonne,                     // 1 si OOP-BETONNE = "Yes"
-        fore,                        // 1 si OOP-FORE = "Yes"
-        tgcc,                        // 1 si TGCC = 1
-        zoneTrv,                     // OOT-ZONE DE TRV : Oui/Non
-        betonneEtat,                 // 1 si OO-ETAT D'AVENCEMENT 1 = BETONNE
-        etatAvancement,              // valeur brute : BETONNE / FORE / ...
-        elevBase,
-        elevHaut,
+        elementType: typeCode,
+        famille:     String(P('OOP_Type') || P('OOP_Famille') || typeCode).trim(),
+        zone:        String(P('OOP_Zone') || '').trim(),
+        direction:   String(P('OOF_ZONE') || '').trim().toUpperCase(),
+        subType:     String(P('OOP_Sub Type') || P('ME_ELEMENT SUB TYPE') || '').trim(),
+        subzone:     String(P('ME_ELEMENT SUB ZONE') || P('ME_ELEMENT SUBZONE') || '').trim(),
+        elementZone: String(P('ME_ELEMENT ZONE') || '').trim().toUpperCase(),
+        volume:      Math.round((parseFloat(String(P('ME_VOLUME') || '').replace(/[^0-9.]/g, '')) || 0) * 100) / 100,
+        length:      parseFloat(String(P('ME_LENGTH') || '').replace(/[^0-9.]/g, '')) || 0,
+        betonne:     toBool(P('OOP-BETONNE')),
+        fore:        toBool(P('OOP-FORE')),
+        tgcc:        toBool(P('TGCC')),
+        zoneTrv:     rawZoneTrv === 'yes' || rawZoneTrv === '1' || rawZoneTrv === 'oui' ? 'Oui' : rawZoneTrv === 'no' || rawZoneTrv === '0' || rawZoneTrv === 'non' ? 'Non' : '',
+        betonneEtat:    etatAvancement === 'BETONNE' ? 1 : 0,
+        etatAvancement,
+        elevBase: parseFloat(String(P('Elevation a la base') || '0').replace(/[^0-9.\-]/g, '')) || 0,
+        elevHaut: parseFloat(String(P('Elevation en haut')   || '0').replace(/[^0-9.\-]/g, '')) || 0,
       });
     }
     res.json({ total: elements.length, elements });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── DIAGNOSTIC : compte PI avec/sans crochet ─────────────
+// ── /api/debug-subzones ───────────────────────────────────────────────────────
+app.get('/api/debug-subzones', async (_req, res) => {
+  try {
+    const token = await getValidToken();
+    const { collection } = await fetchProps(token);
+    const stats = {};
+    let totalVol = 0;
+    for (const obj of collection) {
+      const P = buildPropMap(obj.properties);
+      if (String(P('ME_ELEMENT TYPE') || '').trim().toUpperCase() !== 'PI') continue;
+      const subzone = String(P('ME_ELEMENT SUB ZONE') || '').trim();
+      const tgcc    = P('TGCC');
+      const vol     = parseFloat(String(P('ME_VOLUME') || '').replace(/[^0-9.]/g, '')) || 0;
+      totalVol += vol;
+      const key = subzone || '(vide)';
+      if (!stats[key]) stats[key] = { count: 0, volume: 0, tgccCount: 0 };
+      stats[key].count++;
+      stats[key].volume = Math.round((stats[key].volume + vol) * 100) / 100;
+      if (tgcc === 1 || tgcc === '1' || tgcc === true) stats[key].tgccCount++;
+    }
+    res.json({ totalVolume: Math.round(totalVol * 100) / 100, subzones: stats });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── /api/debug-pi ─────────────────────────────────────────────────────────────
+app.get('/api/debug-pi', async (_req, res) => {
+  try {
+    const token = await getValidToken();
+    const { collection } = await fetchProps(token);
+    const pi = collection.find(o => {
+      const P = buildPropMap(o.properties);
+      return String(P('ME_ELEMENT TYPE') || '').trim().toUpperCase() === 'PI';
+    });
+    if (!pi) return res.json({ error: 'Aucun PI trouvé' });
+    res.json({ objectid: pi.objectid, name: pi.name, properties: pi.properties });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── /api/debug-fore ───────────────────────────────────────────────────────────
+app.get('/api/debug-fore', async (_req, res) => {
+  try {
+    const token = await getValidToken();
+    const { collection } = await fetchProps(token);
+    const fores = [];
+    let totalLen = 0;
+    for (const obj of collection) {
+      const P = buildPropMap(obj.properties);
+      if (String(P('ME_ELEMENT TYPE') || '').trim().toUpperCase() !== 'PI') continue;
+      if (!toBool(P('OOP-FORE'))) continue;
+      const length = parseFloat(String(P('ME_LENGTH') || '0').replace(/[^0-9.]/g, '')) || 0;
+      totalLen += length;
+      fores.push({ id: obj.objectid, name: obj.name, ME_LENGTH_RAW: P('ME_LENGTH'), length });
+    }
+    res.json({ count: fores.length, totalLength: Math.round(totalLen * 100) / 100, fores: fores.slice(0, 20) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── /api/count-pi ─────────────────────────────────────────────────────────────
 app.get('/api/count-pi', async (_req, res) => {
   try {
     const token = await getValidToken();
-    const metaResp = await fetch(
-      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const metaData = await metaResp.json();
-    const metaList = (metaData.data && metaData.data.metadata) || [];
-    const guid = metaList.find(m => m.role === '3d')?.guid || metaList[0]?.guid;
-    const propsResp = await fetch(
-      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata/${guid}/properties?forceget=true`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const propsData = await propsResp.json();
-    const collection = propsData.data?.collection || [];
-    function nk(s) { return String(s).replace(/[\s\-_]/g,'').toLowerCase(); }
-    function bp(props) {
-      const m = {};
-      for (const g of Object.values(props||{})) {
-        if (typeof g==='object' && g) for (const [k,v] of Object.entries(g)) m[nk(k)]=v;
-      }
-      return n => m[nk(n)];
-    }
-    let total=0, withB=0, withoutB=0;
+    const { collection } = await fetchProps(token);
+    let total = 0, withB = 0, withoutB = 0;
     const sans = [];
     for (const obj of collection) {
-      const P = bp(obj.properties);
-      if (String(P('ME_ELEMENT TYPE')||'').trim().toUpperCase() !== 'PI') continue;
+      const P = buildPropMap(obj.properties);
+      if (String(P('ME_ELEMENT TYPE') || '').trim().toUpperCase() !== 'PI') continue;
       total++;
-      if (obj.name && obj.name.includes('[')) { withB++; }
-      else { withoutB++; if(sans.length<20) sans.push({id:obj.objectid,name:obj.name}); }
+      if (obj.name && obj.name.includes('[')) withB++;
+      else { withoutB++; if (sans.length < 20) sans.push({ id: obj.objectid, name: obj.name }); }
     }
     res.json({ totalPI: total, withBracket: withB, withoutBracket: withoutB, exemples: sans });
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── /api/debug-props ──────────────────────────────────────────────────────────
 app.get('/api/debug-props', async (_req, res) => {
   try {
     const token = await getValidToken();
-    const metaResp = await fetch(
-      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const metaData = await metaResp.json();
-    const metaList = (metaData.data && metaData.data.metadata) || [];
-    const guid = metaList[0]?.guid || VIEWABLE_GUID;
-
-    const propsResp = await fetch(
-      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata/${guid}/properties?forceget=true`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const propsData = await propsResp.json();
-    const collection = (propsData.data && propsData.data.collection) || [];
-
-    // Return first 3 elements with ALL their properties
-    const sample = collection.slice(0, 3).map(obj => ({
-      objectid: obj.objectid,
-      name: obj.name,
-      properties: obj.properties
-    }));
+    const { collection } = await fetchProps(token);
+    const sample = collection.slice(0, 3).map(obj => ({ objectid: obj.objectid, name: obj.name, properties: obj.properties }));
     res.json({ total: collection.length, sample });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/acc-status', async (_req, res) => {
-  try {
-    const token = await getValidToken();
-    const resp  = await fetch('https://developer.api.autodesk.com/project/v1/hubs',
-      { headers: { Authorization: `Bearer ${token}` } });
-    res.json({ connected: resp.status === 200 });
-  } catch { res.json({ connected: false }); }
-});
-
-// ── Start ─────────────────────────────────────────────────────────────────────
-app.get(/^(?!\/api).*$/, (_req, res) => {
-  res.sendFile(path.join(__dirname, '../public/index.html'));
-});
-
-
-// ── DIAGNOSTIC : liste toutes les vues disponibles ────────
+// ── /api/list-views ───────────────────────────────────────────────────────────
 app.get('/api/list-views', async (_req, res) => {
   try {
     const token = await getValidToken();
@@ -341,181 +252,49 @@ app.get('/api/list-views', async (_req, res) => {
       `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    const metaData = await metaResp.json();
-    res.json(metaData);
-  } catch(e) { res.status(500).json({ error: e.message }); }
+    res.json(await metaResp.json());
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-
-// ── DEBUG : liste les forés avec leur ME_LENGTH ───────────
-app.get('/api/debug-fore', async (_req, res) => {
-  try {
-    const token = await getValidToken();
-    const metaResp = await fetch(
-      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const metaData = await metaResp.json();
-    const metaList = (metaData.data && metaData.data.metadata) || [];
-    const guid = metaList.find(m => m.guid === VIEWABLE_GUID)?.guid || metaList.find(m => m.role === '3d')?.guid || metaList[0]?.guid;
-    const propsResp = await fetch(
-      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata/${guid}/properties?forceget=true`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const propsData = await propsResp.json();
-    const collection = propsData.data?.collection || [];
-    function nk(s) { return String(s).replace(/[\s\-_]/g,'').toLowerCase(); }
-    function bp(props) {
-      const m = {};
-      for (const g of Object.values(props||{})) {
-        if (typeof g==='object' && g) for (const [k,v] of Object.entries(g)) m[nk(k)]=v;
-      }
-      return n => m[nk(n)];
-    }
-    function toBool(v) {
-      if (!v) return 0;
-      const s = String(v).trim().toLowerCase();
-      return (s==='yes'||s==='1'||s==='true'||s==='oui') ? 1 : 0;
-    }
-    const fores = [];
-    let totalLen = 0;
-    for (const obj of collection) {
-      const P = bp(obj.properties);
-      if (String(P('ME_ELEMENT TYPE')||'').trim().toUpperCase() !== 'PI') continue;
-      if (!toBool(P('OOP-FORE'))) continue;
-      const rawLen = String(P('ME_LENGTH')||'0').replace(/[^0-9.]/g,'');
-      const length = parseFloat(rawLen) || 0;
-      totalLen += length;
-      fores.push({ id: obj.objectid, name: obj.name, ME_LENGTH_RAW: P('ME_LENGTH'), length });
-    }
-    res.json({ count: fores.length, totalLength: Math.round(totalLen*100)/100, fores: fores.slice(0,20) });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-
-// ── DEBUG : propriétés complètes d'un PI ─────────────────
-app.get('/api/debug-pi', async (_req, res) => {
-  try {
-    const token = await getValidToken();
-    const metaResp = await fetch(
-      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const metaData = await metaResp.json();
-    const metaList = (metaData.data && metaData.data.metadata) || [];
-    const guid = metaList.find(m => m.guid === VIEWABLE_GUID)?.guid
-              || metaList.find(m => m.role === '3d')?.guid
-              || metaList[0]?.guid;
-    const propsResp = await fetch(
-      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata/${guid}/properties?forceget=true`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const propsData = await propsResp.json();
-    const collection = propsData.data?.collection || [];
-    function nk(s) { return String(s).replace(/[\s\-_]/g,'').toLowerCase(); }
-    function bp(props) {
-      const m = {};
-      for (const g of Object.values(props||{})) {
-        if (typeof g==='object' && g) for (const [k,v] of Object.entries(g)) m[nk(k)]=v;
-      }
-      return n => m[nk(n)];
-    }
-    // Trouver le premier PI et retourner TOUTES ses propriétés
-    const pi = collection.find(o => {
-      const P = bp(o.properties);
-      return String(P('ME_ELEMENT TYPE')||'').trim().toUpperCase() === 'PI';
-    });
-    if (!pi) return res.json({ error: 'Aucun PI trouvé' });
-    res.json({ objectid: pi.objectid, name: pi.name, properties: pi.properties });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-
-// ── DEBUG : liste les subzones disponibles ───────────────
-app.get('/api/debug-subzones', async (_req, res) => {
-  try {
-    const token = await getValidToken();
-    const metaResp = await fetch(
-      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const metaData = await metaResp.json();
-    const metaList = (metaData.data && metaData.data.metadata) || [];
-    const guid = metaList.find(m => m.guid === VIEWABLE_GUID)?.guid
-              || metaList.find(m => m.role === '3d')?.guid
-              || metaList[0]?.guid;
-    const propsResp = await fetch(
-      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata/${guid}/properties?forceget=true`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const propsData = await propsResp.json();
-    const collection = propsData.data?.collection || [];
-    function nk(s) { return String(s).replace(/[\s\-_]/g,'').toLowerCase(); }
-    function bp(props) {
-      const m = {};
-      for (const g of Object.values(props||{})) {
-        if (typeof g==='object' && g) for (const [k,v] of Object.entries(g)) m[nk(k)]=v;
-      }
-      return n => m[nk(n)];
-    }
-    const stats = {};
-    let totalVol = 0;
-    for (const obj of collection) {
-      const P = bp(obj.properties);
-      if (String(P('ME_ELEMENT TYPE')||'').trim().toUpperCase() !== 'PI') continue;
-      const subzone = String(P('ME_ELEMENT SUB ZONE')||'').trim();
-      const tgcc = P('TGCC');
-      const rawVol = String(P('ME_VOLUME')||'').replace(/[^0-9.]/g,'');
-      const vol = parseFloat(rawVol) || 0;
-      totalVol += vol;
-      const key = subzone || '(vide)';
-      if (!stats[key]) stats[key] = { count: 0, volume: 0, tgccCount: 0 };
-      stats[key].count++;
-      stats[key].volume += vol;
-      if (tgcc === 1 || tgcc === '1' || tgcc === true) stats[key].tgccCount++;
-    }
-    res.json({ totalVolume: Math.round(totalVol*100)/100, subzones: stats });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-app.listen(PORT, () => {
-  console.log(`\n🏗️  SGTM Fondations  →  http://localhost:${PORT}`);
-  console.log(`🔑 Login            →  http://localhost:${PORT}/api/auth/login`);
-});
-
-// TEMP: debug raw props — show all values
+// ── /api/raw-props ────────────────────────────────────────────────────────────
 app.get('/api/raw-props', async (_req, res) => {
   try {
     const token = await getValidToken();
-    const metaResp = await fetch(
-      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const metaData = await metaResp.json();
-    const guid = (metaData.data?.metadata || [])[0]?.guid || VIEWABLE_GUID;
-    const propsResp = await fetch(
-      `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata/${guid}/properties?forceget=true`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const propsData = await propsResp.json();
-    const collection = propsData.data?.collection || [];
-    // One SI and one PI with ALL values
+    const { collection } = await fetchProps(token);
     const findOne = (type) => {
       const obj = collection.find(o => {
         const flat = {};
-        Object.values(o.properties||{}).forEach(g => { if(typeof g==='object') Object.assign(flat,g); });
+        Object.values(o.properties || {}).forEach(g => { if (typeof g === 'object') Object.assign(flat, g); });
         return flat['ME_ELEMENT TYPE'] === type;
       });
       if (!obj) return null;
       const flat = {};
-      Object.values(obj.properties||{}).forEach(g => { if(typeof g==='object') Object.assign(flat,g); });
-      // Return ALL ME_ and OOP_ params with their values
+      Object.values(obj.properties || {}).forEach(g => { if (typeof g === 'object') Object.assign(flat, g); });
       const result = { name: obj.name };
-      Object.entries(flat).forEach(([k,v]) => {
-        if (k.startsWith('ME_') || k.startsWith('OOP_') || k === 'Volume') result[k] = v;
-      });
+      Object.entries(flat).forEach(([k, v]) => { if (k.startsWith('ME_') || k.startsWith('OOP_') || k === 'Volume') result[k] = v; });
       return result;
     };
     res.json({ total: collection.length, SI: findOne('SI'), PI: findOne('PI') });
-  } catch(e) { res.status(500).json({error: e.message}); }
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── /api/acc-status ───────────────────────────────────────────────────────────
+app.get('/api/acc-status', async (_req, res) => {
+  try {
+    const token = await getValidToken();
+    const resp  = await fetch('https://developer.api.autodesk.com/project/v1/hubs', { headers: { Authorization: `Bearer ${token}` } });
+    res.json({ connected: resp.status === 200 });
+  } catch { res.json({ connected: false }); }
+});
+
+// ── Catch-all ─────────────────────────────────────────────────────────────────
+app.get(/^(?!\/api).*$/, (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+
+// ── Start — TOUJOURS EN DERNIER ───────────────────────────────────────────────
+app.listen(PORT, () => {
+  console.log(`
+🏗️  SGTM Fondations  →  http://localhost:${PORT}`);
+  console.log(`🔑 Login            →  http://localhost:${PORT}/api/auth/login`);
 });

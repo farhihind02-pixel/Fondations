@@ -3,6 +3,7 @@
    - Filtres multi-sélection (checkboxes)
    - Bétonnés / Forés corrigés
    - Semelles supprimées
+   - Zoom sur filtre sélectionné
 ═══════════════════════════════════════════════════════════ */
 
 // ── MAPPING BLOC ↔ ZONES ──────────────────────────────────
@@ -27,7 +28,6 @@ const TYPE_COLORS = {
 };
 
 // ── DONNÉES STATIQUES FALLBACK ────────────────────────────
-// OOP_BETONNE et OOP_FORE : 1 = oui, 0 = non
 const STATIC_DATA = [
   { dbId:1001, elementType:'PI', famille:'Pieu BA-ST', zone:'1', bloc:'Bloc 1', direction:'NE', volume:2131, length:12.5, betonne:1, fore:1 },
   { dbId:1002, elementType:'PI', famille:'Pieu BA-ST', zone:'2', bloc:'Bloc 1', direction:'NW', volume:7403, length:14.2, betonne:1, fore:1 },
@@ -49,7 +49,6 @@ let charts           = {};
 let viewer           = null;
 let viewerLoaded     = false;
 
-// État des filtres multi-sélection
 const filterState = {
   bloc:      new Set(),
   zone:      new Set(),
@@ -132,24 +131,24 @@ async function loadData() {
       allElements = data.elements
         .filter(e => (e.elementType || '').toUpperCase() === 'PI')
         .map(e => ({
-          dbId:      e.dbId,
-          name:      e.name || '',
+          dbId:        e.dbId,
+          name:        e.name || '',
           elementType: 'PI',
-          famille:   e.famille || 'Pieu',
-          subType:   e.subType  || '—',
-          zone:      String(e.zone || '').trim(),
-          subzone:   String(e.subzone || '').trim(),  // ME_ELEMENT SUB ZONE
-          bloc:      getBlocFromZone(String(e.zone || '').trim()),
-          direction: String(e.direction || '').trim().toUpperCase(),
-          volume:    parseFloat(e.volume)  || 0,
-          length:    parseFloat(e.length)  || 0,
+          famille:     e.famille || 'Pieu',
+          subType:     e.subType  || '—',
+          zone:        String(e.zone || '').trim(),
+          subzone:     String(e.subzone || '').trim(),
+          bloc:        getBlocFromZone(String(e.zone || '').trim()),
+          direction:   String(e.direction || '').trim().toUpperCase(),
+          volume:      parseFloat(e.volume)  || 0,
+          length:      parseFloat(e.length)  || 0,
           betonne:        Number(e.betonne),
           fore:           Number(e.fore),
           tgcc:           Number(e.tgcc),
           zoneTrv:        String(e.zoneTrv || '').trim(),
-          betonneEtat:    Number(e.betonneEtat),    // OO-ETAT D'AVENCEMENT 1 = BETONNE
+          betonneEtat:    Number(e.betonneEtat),
           etatAvancement: String(e.etatAvancement || '').trim().toUpperCase(),
-          elementZone: String(e.elementZone || '').trim().toUpperCase(),
+          elementZone:    String(e.elementZone || '').trim().toUpperCase(),
         }));
     } else throw new Error('fallback');
   } catch {
@@ -176,7 +175,6 @@ function toggleDropdown(id) {
   const dd = document.getElementById(id);
   const menu = dd.querySelector('.f-menu');
   const isOpen = menu.classList.contains('open');
-  // Fermer tous les autres
   document.querySelectorAll('.f-menu.open').forEach(m => m.classList.remove('open'));
   document.querySelectorAll('.f-dropdown.active').forEach(d => d.classList.remove('active'));
   if (!isOpen) {
@@ -190,7 +188,6 @@ function selectAll(menuId) {
   const boxes = menu.querySelectorAll('input[type="checkbox"]:not(.cb-selectall)');
   const allChecked = [...boxes].every(cb => cb.checked);
   boxes.forEach(cb => cb.checked = !allChecked);
-  // Met à jour la case "Tout sélectionner"
   const master = menu.querySelector('.cb-selectall');
   if (master) master.checked = !allChecked;
   applyFilters();
@@ -213,7 +210,6 @@ function buildMenu(menuId, items) {
 }
 
 function populateFilters() {
-  // ME_ELEMENT SUB ZONE
   const subzones = [...new Set(allElements.map(e => e.subzone).filter(Boolean))].sort(naturalSort);
   document.getElementById('menuZone').innerHTML = buildMenu('menuZone',
     subzones.map(z => `<label class="f-item"><input type="checkbox" value="${z}" onchange="syncSelectAll('menuZone')"> ${z}</label>`).join('')
@@ -239,21 +235,12 @@ function updateBadge(badgeId, values) {
 function applyFilters() {
   const zones = getCheckedValues('menuZone');
   const etats = getCheckedValues('menuEtat');
+  const tgcc  = getCheckedValues('menuTGCC');
   updateBadge('badgeZone', zones);
   updateBadge('badgeEtat', etats);
-
-  const tgcc     = getCheckedValues('menuTGCC');
-  updateBadge('badgeTGCC',    tgcc);
+  updateBadge('badgeTGCC', tgcc);
 
   filteredElements = allElements.filter(e => {
-    // Filtre Zone : éléments de la subzone sélectionnée SANS les TGCC
-    const okZone = zones.length === 0 || (zones.includes(e.subzone) && e.tgcc !== 1);
-    // Filtre TGCC : éléments avec TGCC=1 uniquement quand coché
-    const okTGCC = tgcc.length  === 0 || (tgcc.includes('TGCC') && e.tgcc === 1);
-    // Si aucun filtre Zone ni TGCC → tout afficher
-    // Si Zone coché sans TGCC → subzone sans TGCC
-    // Si TGCC coché sans Zone → TGCC seulement
-    // Si les deux cochés → (subzone sans TGCC) OU (TGCC)
     let okZoneTGCC;
     if (zones.length === 0 && tgcc.length === 0) {
       okZoneTGCC = true;
@@ -297,26 +284,22 @@ function refresh() {
 
 // ── KPIs ──────────────────────────────────────────────────
 function updateKPIs() {
-  // Profondeur totale = somme de ME_LENGTH de tous les pieux filtrés
-  const pieux  = filteredElements.filter(e => e.elementType === 'PI');
-  const pLen   = sum(pieux, 'length');
-  const pVol   = sum(pieux, 'volume');
+  const pieux = filteredElements.filter(e => e.elementType === 'PI');
+  const pLen  = sum(pieux, 'length');
+  const pVol  = sum(pieux, 'volume');
 
   document.getElementById('kpiPieuxCount').textContent  = fmt(pLen) + ' ml';
   document.getElementById('kpiPieuxVolume').textContent = `${pieux.length.toLocaleString('fr-FR')} pieux`;
   document.getElementById('kpiTotalCount').textContent  = fmt(pVol) + ' m³';
   document.getElementById('kpiTotalVolume').textContent = '';
 
-  // Volume réalisé = éléments filtrés avec OO-ETAT D'AVENCEMENT 1 = BETONNE
   const betonnes = filteredElements.filter(e => e.betonneEtat === 1);
   const bCount   = betonnes.length;
   const bVol     = sum(betonnes, 'volume');
 
-  document.getElementById('kpiBetonne').textContent       = fmt(bVol) + ' m³';
-  document.getElementById('kpiBetonneVolume').textContent  = bCount.toLocaleString('fr-FR') + ' éléments bétonnés';
+  document.getElementById('kpiBetonne').textContent      = fmt(bVol) + ' m³';
+  document.getElementById('kpiBetonneVolume').textContent = bCount.toLocaleString('fr-FR') + ' éléments bétonnés';
 
-
-  // PROFONDEUR FORÉE = ME_LENGTH bétonnés + ME_LENGTH FORE
   const profBetonne  = sum(filteredElements.filter(e => e.betonneEtat === 1), 'length');
   const profForeEtat = sum(filteredElements.filter(e => e.etatAvancement === 'FORE'), 'length');
   const profFore     = profBetonne + profForeEtat;
@@ -324,7 +307,6 @@ function updateKPIs() {
 
   document.getElementById('kpiFore').textContent       = fmt(profFore) + ' ml';
   document.getElementById('kpiForeLength').textContent = unionCount.toLocaleString('fr-FR') + ' éléments';
-
 }
 
 // ── CHARTS ────────────────────────────────────────────────
@@ -342,7 +324,6 @@ function mkChart(id, type, data, options) {
 }
 
 function updateCharts() {
-  // ── Volume réalisé vs total (donut) ──────────────────
   const totalVol   = sum(filteredElements, 'volume');
   const betonneVol = sum(filteredElements.filter(e => e.betonneEtat === 1), 'volume');
   const resteVol   = Math.max(0, totalVol - betonneVol);
@@ -363,11 +344,10 @@ function updateCharts() {
     }
   });
 
-  // ── Profondeur forée vs total (donut) ─────────────────
-  const profTotale   = sum(filteredElements, 'length');
-  const profForee    = sum(filteredElements.filter(e => e.betonneEtat === 1 || e.etatAvancement === 'FORE'), 'length');
-  const profReste    = Math.max(0, profTotale - profForee);
-  const fPct         = profTotale ? Math.round(profForee / profTotale * 100) : 0;
+  const profTotale = sum(filteredElements, 'length');
+  const profForee  = sum(filteredElements.filter(e => e.betonneEtat === 1 || e.etatAvancement === 'FORE'), 'length');
+  const profReste  = Math.max(0, profTotale - profForee);
+  const fPct       = profTotale ? Math.round(profForee / profTotale * 100) : 0;
 
   mkChart('chartForePie', 'doughnut', {
     labels: [`Profondeur forée — ${fPct}%`, `Reste — ${100 - fPct}%`],
@@ -384,7 +364,6 @@ function updateCharts() {
     }
   });
 
-  // ── Mini donut bétonnés (KPI) ──────────────────────────
   const bN  = filteredElements.filter(e => e.betonne === 1).length;
   const nbN = filteredElements.length - bN;
   mkChart('chartBetonneKpi', 'doughnut', {
@@ -395,7 +374,6 @@ function updateCharts() {
     plugins: { legend: { display: false }, tooltip: { enabled: false } }
   });
 
-  // ── Mini donut forés (KPI) ─────────────────────────────
   const fN  = filteredElements.filter(e => e.fore === 1).length;
   const nfN = filteredElements.length - fN;
   mkChart('chartForeKpi', 'doughnut', {
@@ -405,18 +383,11 @@ function updateCharts() {
     responsive: true, maintainAspectRatio: false, cutout: '72%',
     plugins: { legend: { display: false }, tooltip: { enabled: false } }
   });
-
 }
 
 // ── TABLE AVANCEMENT ──────────────────────────────────────
 function updateTable() {
-  // Grouper par OOP_Type + ME_ELEMENT SUB TYPE (Dim)
-  // Chaque groupe = une ligne dans le tableau
   const groups = {};
-
-  // On utilise allElements pour NB TOTAL (tous les pieux de ce type)
-  // et filteredElements pour NB RÉALISÉ / FORÉ (selon filtre Etat)
-  // Tout basé sur filteredElements — réagit aux filtres Zone et Etat
   filteredElements.forEach(e => {
     const element = e.famille || 'Pieux';
     const dim     = e.subType || '—';
@@ -430,13 +401,10 @@ function updateTable() {
     groups[k].total       += 1;
     groups[k].volumeTotal += e.volume || 0;
     groups[k].lengthTotal += e.length || 0;
-    // NB RÉALISÉ = OO-ETAT D'AVENCEMENT 1 === BETONNE
     if (e.betonneEtat === 1) {
       groups[k].coule       += 1;
       groups[k].volumeCoule += e.volume || 0;
     }
-    // NB FORÉ = foré OU bétonné (OO-ETAT = BETONNE implique foré préalable)
-    // NB FORÉ = betonneEtat=1 OU etatAvancement=FORE (même logique que PROFONDEUR FORÉE)
     if (e.betonneEtat === 1 || e.etatAvancement === 'FORE') {
       groups[k].fore       += 1;
       groups[k].lengthFore += e.length || 0;
@@ -444,11 +412,11 @@ function updateTable() {
   });
 
   const rows = Object.values(groups).sort((a, b) => a.dim.localeCompare(b.dim, 'fr', { numeric: true }));
+  const TOTAL_PIEUX_FIXE = 491;
 
-  // ── TABLEAU COULAGE ────────────────────────────────────
+  // TABLEAU COULAGE
   let totalC = 0, totalCoule = 0, totalVolT = 0, totalVolC = 0;
   document.getElementById('tableCoulageBody').innerHTML = rows.map(g => {
-    const TOTAL_PIEUX_FIXE = 491;
     const pct = Math.round(g.coule / TOTAL_PIEUX_FIXE * 100);
     totalC     += g.total;
     totalCoule += g.coule;
@@ -465,7 +433,6 @@ function updateTable() {
       '</tr>';
   }).join('');
 
-  const TOTAL_PIEUX_FIXE = 491;
   const pctTotalC = Math.round(totalCoule / TOTAL_PIEUX_FIXE * 100);
   document.getElementById('tableCoulageFoot').innerHTML =
     '<tr class="tfoot-total">' +
@@ -477,13 +444,13 @@ function updateTable() {
     '<td><strong>' + pctTotalC + '%</strong></td>' +
     '</tr>';
 
-  // ── TABLEAU FORAGE ─────────────────────────────────────
+  // TABLEAU FORAGE
   let totalF = 0, totalFore = 0, totalLenT = 0, totalLenF = 0;
   document.getElementById('tableForageBody').innerHTML = rows.map(g => {
-    const pct = Math.round(g.fore / 491 * 100);
+    const pct = Math.round(g.fore / TOTAL_PIEUX_FIXE * 100);
     totalF    += g.total;
     totalFore += g.fore;
-    totalLenT += g.lengthTotal;  // LONGUEUR TOTALE = PROFONDEUR TOTALE PIEUX
+    totalLenT += g.lengthTotal;
     totalLenF += g.lengthFore;
     return '<tr>' +
       '<td class="td-elem">' + g.element + '</td>' +
@@ -496,7 +463,7 @@ function updateTable() {
       '</tr>';
   }).join('');
 
-  const pctTotalF = Math.round(totalFore / 491 * 100);
+  const pctTotalF = Math.round(totalFore / TOTAL_PIEUX_FIXE * 100);
   document.getElementById('tableForageFoot').innerHTML =
     '<tr class="tfoot-total">' +
     '<td colspan="2"><strong>TOTAL PIEUX</strong></td>' +
@@ -561,28 +528,56 @@ function hasActiveFilters() {
   return document.querySelectorAll('.f-menu input[type="checkbox"]:checked').length > 0;
 }
 
+// ── VIEWER HIGHLIGHT + ZOOM SUR FILTRE ───────────────────
 function updateViewerHighlight() {
   if (!viewerLoaded || !viewer || !window.THREE) return;
-  if (!hasActiveFilters()) { resetViewerHighlight(); return; }
 
-  viewer.clearThemingColors();
-  const filteredIds = new Set(filteredElements.map(e => e.dbId).filter(id => typeof id === 'number'));
-  const allIds = allElements.map(e => e.dbId).filter(id => typeof id === 'number');
+  if (!hasActiveFilters()) {
+    resetViewerHighlight();
+    return;
+  }
 
-  const orange      = new THREE.Vector4(1.0, 0.549, 0.294, 1);   // #ffa017
-  const transparent = new THREE.Vector4(0.4, 0.4, 0.4, 0.15);    // très atténué
+  const filteredIds = filteredElements
+    .map(e => e.dbId)
+    .filter(id => typeof id === 'number');
 
-  allIds.forEach(id => {
-    viewer.setThemingColor(id, filteredIds.has(id) ? orange : transparent);
+  // 1. Isoler les éléments filtrés (masque les autres)
+  viewer.isolate(filteredIds);
+
+  // 2. Zoomer sur les éléments filtrés
+  if (filteredIds.length > 0) {
+    setTimeout(() => {
+      viewer.fitToView(filteredIds, viewer.model, false);
+    }, 300);
+  }
+
+  // 3. Coloriser :
+  //    - éléments filtrés sélectionnés → orange (comme la légende)
+  //    - éléments non filtrés → gris atténué (déjà masqués par isolate,
+  //      mais on colorie quand même pour cohérence)
+  viewer.clearThemingColors(viewer.model);
+
+  // Orange pour tous les éléments filtrés (sélectionnés)
+  const orange = new THREE.Vector4(1.0, 0.627, 0.090, 1); // #ffa017
+  filteredElements.forEach(e => {
+    if (typeof e.dbId !== 'number') return;
+    viewer.setThemingColor(e.dbId, orange, viewer.model, true);
   });
+
   viewer.impl && viewer.impl.invalidate(true, true, true);
 }
 
 function resetViewerHighlight() {
   if (!viewerLoaded || !viewer) return;
-  // Reset agressif : alpha=0 sur chaque element puis clearThemingColors global
-  const allIds = allElements.map(e => e.dbId).filter(id => typeof id === 'number');
-  allIds.forEach(id => viewer.setThemingColor(id, new THREE.Vector4(0, 0, 0, 0)));
-  viewer.clearThemingColors();
+
+  // 1. Tout réafficher
+  viewer.showAll();
+
+  // 2. Supprimer les couleurs
+  viewer.clearThemingColors(viewer.model);
+
+  // 3. Revenir à la vue globale
+  viewer.fitToView();
+
   viewer.impl && viewer.impl.invalidate(true, true, true);
 }
