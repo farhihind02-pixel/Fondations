@@ -4,9 +4,9 @@
    - Bétonnés / Forés corrigés
    - Semelles supprimées
    - Zoom sur filtre sélectionné
+   - % AVANC calculé sur le total réel filtré
 ═══════════════════════════════════════════════════════════ */
 
-// ── MAPPING BLOC ↔ ZONES ──────────────────────────────────
 const BLOC_ZONE_MAP = {
   'Bloc 1': ['1','2'],
   'Bloc 2': ['3','4'],
@@ -27,7 +27,6 @@ const TYPE_COLORS = {
   'PI':         '#ffa017',
 };
 
-// ── DONNÉES STATIQUES FALLBACK ────────────────────────────
 const STATIC_DATA = [
   { dbId:1001, elementType:'PI', famille:'Pieu BA-ST', zone:'1', bloc:'Bloc 1', direction:'NE', volume:2131, length:12.5, betonne:1, fore:1 },
   { dbId:1002, elementType:'PI', famille:'Pieu BA-ST', zone:'2', bloc:'Bloc 1', direction:'NW', volume:7403, length:14.2, betonne:1, fore:1 },
@@ -63,7 +62,6 @@ const fmt = (v) => {
   return n.toLocaleString('fr-FR', { minimumFractionDigits:2, maximumFractionDigits:2 });
 };
 
-// ── UTILITAIRE APS ────────────────────────────────────────
 function getProp(props, name) {
   if (!props) return null;
   const norm = s => s.replace(/[\s_\-]/g,'').toLowerCase();
@@ -77,7 +75,6 @@ function getProp(props, name) {
   return null;
 }
 
-// ── INIT ──────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   setDate();
   checkAuth();
@@ -96,7 +93,6 @@ function setDate() {
   if (el) el.textContent = new Date().toLocaleDateString('fr-FR');
 }
 
-// ── AUTH ──────────────────────────────────────────────────
 async function checkAuth() {
   const badge = document.getElementById('accStatus');
   const label = document.getElementById('accLabel');
@@ -122,7 +118,6 @@ async function checkAuth() {
   }
 }
 
-// ── DATA ──────────────────────────────────────────────────
 async function loadData() {
   try {
     const res  = await fetch('/api/properties');
@@ -131,17 +126,17 @@ async function loadData() {
       allElements = data.elements
         .filter(e => (e.elementType || '').toUpperCase() === 'PI')
         .map(e => ({
-          dbId:        e.dbId,
-          name:        e.name || '',
-          elementType: 'PI',
-          famille:     e.famille || 'Pieu',
-          subType:     e.subType  || '—',
-          zone:        String(e.zone || '').trim(),
-          subzone:     String(e.subzone || '').trim(),
-          bloc:        getBlocFromZone(String(e.zone || '').trim()),
-          direction:   String(e.direction || '').trim().toUpperCase(),
-          volume:      parseFloat(e.volume)  || 0,
-          length:      parseFloat(e.length)  || 0,
+          dbId:           e.dbId,
+          name:           e.name || '',
+          elementType:    'PI',
+          famille:        e.famille || 'Pieu',
+          subType:        e.subType  || '—',
+          zone:           String(e.zone || '').trim(),
+          subzone:        String(e.subzone || '').trim(),
+          bloc:           getBlocFromZone(String(e.zone || '').trim()),
+          direction:      String(e.direction || '').trim().toUpperCase(),
+          volume:         parseFloat(e.volume)  || 0,
+          length:         parseFloat(e.length)  || 0,
           betonne:        Number(e.betonne),
           fore:           Number(e.fore),
           tgcc:           Number(e.tgcc),
@@ -166,7 +161,6 @@ function getBlocFromZone(zone) {
   return '—';
 }
 
-// ── FILTRES MULTI-SÉLECTION ───────────────────────────────
 function naturalSort(a, b) {
   return a.localeCompare(b, 'fr', { numeric: true, sensitivity: 'base' });
 }
@@ -273,7 +267,6 @@ function resetFilters() {
   resetViewerHighlight();
 }
 
-// ── REFRESH ───────────────────────────────────────────────
 function refresh() {
   document.getElementById('elementCount').textContent =
     `${filteredElements.length.toLocaleString('fr-FR')} éléments`;
@@ -282,7 +275,6 @@ function refresh() {
   updateTable();
 }
 
-// ── KPIs ──────────────────────────────────────────────────
 function updateKPIs() {
   const pieux = filteredElements.filter(e => e.elementType === 'PI');
   const pLen  = sum(pieux, 'length');
@@ -297,7 +289,7 @@ function updateKPIs() {
   const bCount   = betonnes.length;
   const bVol     = sum(betonnes, 'volume');
 
-  document.getElementById('kpiBetonne').textContent      = fmt(bVol) + ' m³';
+  document.getElementById('kpiBetonne').textContent       = fmt(bVol) + ' m³';
   document.getElementById('kpiBetonneVolume').textContent = bCount.toLocaleString('fr-FR') + ' éléments bétonnés';
 
   const profBetonne  = sum(filteredElements.filter(e => e.betonneEtat === 1), 'length');
@@ -309,7 +301,6 @@ function updateKPIs() {
   document.getElementById('kpiForeLength').textContent = unionCount.toLocaleString('fr-FR') + ' éléments';
 }
 
-// ── CHARTS ────────────────────────────────────────────────
 const TT = {
   backgroundColor:'#fff', titleColor:'#1a1d23', bodyColor:'#6b7280',
   borderColor:'#e2e5ea', borderWidth:1, padding:10, cornerRadius:8,
@@ -385,7 +376,8 @@ function updateCharts() {
   });
 }
 
-// ── TABLE AVANCEMENT ──────────────────────────────────────
+// ── TABLE AVANCEMENT ─────────────────────────────────────
+// % AVANC = NB RÉALISÉ / NB TOTAL du groupe (pas une valeur fixe)
 function updateTable() {
   const groups = {};
   filteredElements.forEach(e => {
@@ -412,12 +404,12 @@ function updateTable() {
   });
 
   const rows = Object.values(groups).sort((a, b) => a.dim.localeCompare(b.dim, 'fr', { numeric: true }));
-  const TOTAL_PIEUX_FIXE = 491;
 
-  // TABLEAU COULAGE
+  // ── TABLEAU COULAGE ───────────────────────────────────
   let totalC = 0, totalCoule = 0, totalVolT = 0, totalVolC = 0;
   document.getElementById('tableCoulageBody').innerHTML = rows.map(g => {
-    const pct = Math.round(g.coule / TOTAL_PIEUX_FIXE * 100);
+    // % AVANC = réalisés du groupe / total du groupe
+    const pct = g.total > 0 ? Math.round(g.coule / g.total * 100) : 0;
     totalC     += g.total;
     totalCoule += g.coule;
     totalVolT  += g.volumeTotal;
@@ -429,11 +421,12 @@ function updateTable() {
       '<td class="td-orange">' + g.coule + '</td>' +
       '<td>' + fmt(g.volumeTotal) + '</td>' +
       '<td class="td-orange">' + fmt(g.volumeCoule) + '</td>' +
-      '<td><div class="pct-inline"><div class="pct-track"><div class="pct-fill-bar" style="width:' + pct + '%"></div></div><span>' + pct + '%</span></div></td>' +
+      '<td><div class="pct-inline"><div class="pct-track"><div class="pct-fill-bar" style="width:' + Math.min(pct,100) + '%"></div></div><span>' + pct + '%</span></div></td>' +
       '</tr>';
   }).join('');
 
-  const pctTotalC = Math.round(totalCoule / TOTAL_PIEUX_FIXE * 100);
+  // Total : réalisés / total filtré
+  const pctTotalC = totalC > 0 ? Math.round(totalCoule / totalC * 100) : 0;
   document.getElementById('tableCoulageFoot').innerHTML =
     '<tr class="tfoot-total">' +
     '<td colspan="2"><strong>TOTAL PIEUX</strong></td>' +
@@ -444,10 +437,11 @@ function updateTable() {
     '<td><strong>' + pctTotalC + '%</strong></td>' +
     '</tr>';
 
-  // TABLEAU FORAGE
+  // ── TABLEAU FORAGE ────────────────────────────────────
   let totalF = 0, totalFore = 0, totalLenT = 0, totalLenF = 0;
   document.getElementById('tableForageBody').innerHTML = rows.map(g => {
-    const pct = Math.round(g.fore / TOTAL_PIEUX_FIXE * 100);
+    // % AVANC = forés du groupe / total du groupe
+    const pct = g.total > 0 ? Math.round(g.fore / g.total * 100) : 0;
     totalF    += g.total;
     totalFore += g.fore;
     totalLenT += g.lengthTotal;
@@ -459,11 +453,12 @@ function updateTable() {
       '<td class="td-navy">' + g.fore + '</td>' +
       '<td>' + fmt(g.lengthTotal) + '</td>' +
       '<td class="td-navy">' + fmt(g.lengthFore) + '</td>' +
-      '<td><div class="pct-inline"><div class="pct-track"><div class="pct-fill-bar" style="background:#1e3a5f;width:' + pct + '%"></div></div><span>' + pct + '%</span></div></td>' +
+      '<td><div class="pct-inline"><div class="pct-track"><div class="pct-fill-bar" style="background:#1e3a5f;width:' + Math.min(pct,100) + '%"></div></div><span>' + pct + '%</span></div></td>' +
       '</tr>';
   }).join('');
 
-  const pctTotalF = Math.round(totalFore / TOTAL_PIEUX_FIXE * 100);
+  // Total : forés / total filtré
+  const pctTotalF = totalF > 0 ? Math.round(totalFore / totalF * 100) : 0;
   document.getElementById('tableForageFoot').innerHTML =
     '<tr class="tfoot-total">' +
     '<td colspan="2"><strong>TOTAL PIEUX</strong></td>' +
@@ -517,6 +512,20 @@ async function initViewer() {
           viewerLoaded = true;
           const ph = document.getElementById('viewerPlaceholder');
           if (ph) ph.classList.add('hidden');
+
+          function autoFit() {
+            try { viewer.fitToView(); } catch(e) {}
+          }
+          if (viewer.isLoadDone && viewer.isLoadDone()) {
+            setTimeout(autoFit, 300);
+          }
+          viewer.addEventListener(
+            Autodesk.Viewing.GEOMETRY_LOADED_EVENT,
+            () => setTimeout(autoFit, 300),
+            { once: true }
+          );
+          setTimeout(autoFit, 3000);
+
           updateViewerHighlight();
         }).catch(() => showViewerError('Impossible de charger la vue 3D.'));
       }, () => showViewerError('Erreur ACC — vérifiez la connexion'));
@@ -528,7 +537,6 @@ function hasActiveFilters() {
   return document.querySelectorAll('.f-menu input[type="checkbox"]:checked').length > 0;
 }
 
-// ── VIEWER HIGHLIGHT + ZOOM SUR FILTRE ───────────────────
 function updateViewerHighlight() {
   if (!viewerLoaded || !viewer || !window.THREE) return;
 
@@ -541,24 +549,16 @@ function updateViewerHighlight() {
     .map(e => e.dbId)
     .filter(id => typeof id === 'number');
 
-  // 1. Isoler les éléments filtrés (masque les autres)
   viewer.isolate(filteredIds);
 
-  // 2. Zoomer sur les éléments filtrés
   if (filteredIds.length > 0) {
     setTimeout(() => {
       viewer.fitToView(filteredIds, viewer.model, false);
     }, 300);
   }
 
-  // 3. Coloriser :
-  //    - éléments filtrés sélectionnés → orange (comme la légende)
-  //    - éléments non filtrés → gris atténué (déjà masqués par isolate,
-  //      mais on colorie quand même pour cohérence)
   viewer.clearThemingColors(viewer.model);
-
-  // Orange pour tous les éléments filtrés (sélectionnés)
-  const orange = new THREE.Vector4(1.0, 0.627, 0.090, 1); // #ffa017
+  const orange = new THREE.Vector4(1.0, 0.627, 0.090, 1);
   filteredElements.forEach(e => {
     if (typeof e.dbId !== 'number') return;
     viewer.setThemingColor(e.dbId, orange, viewer.model, true);
@@ -569,15 +569,8 @@ function updateViewerHighlight() {
 
 function resetViewerHighlight() {
   if (!viewerLoaded || !viewer) return;
-
-  // 1. Tout réafficher
   viewer.showAll();
-
-  // 2. Supprimer les couleurs
   viewer.clearThemingColors(viewer.model);
-
-  // 3. Revenir à la vue globale
   viewer.fitToView();
-
   viewer.impl && viewer.impl.invalidate(true, true, true);
 }
