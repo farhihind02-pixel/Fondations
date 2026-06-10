@@ -98,15 +98,15 @@
 
       <!-- Entreprise -->
       <div class="f-dropdown" id="ddEntreprise">
-        <button class="f-btn" onclick="toggleDropdown('ddEntreprise')">
-          Entreprise <span class="f-badge" id="badgeEntreprise"></span>
-          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6,9 12,15 18,9"/></svg>
-        </button>
-        <div class="f-menu" id="menuEntreprise">
-          <label class="f-item"><input type="checkbox" value="TGCC" onchange="applyFilters()"> TGCC</label>
-          <label class="f-item"><input type="checkbox" value="SGTM" onchange="applyFilters()"> SGTM</label>
-        </div>
-      </div>
+  <button class="f-btn" onclick="toggleDropdown('ddEntreprise')">
+    Entreprise <span class="f-badge" id="badgeEntreprise"></span>
+    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6,9 12,15 18,9"/></svg>
+  </button>
+  <div class="f-menu" id="menuEntreprise">
+    <label class="f-item"><input type="checkbox" value="SGTM" onchange="applyFilters()"> SGTM</label>
+    <label class="f-item"><input type="checkbox" value="TGCC" onchange="applyFilters()"> TGCC</label>
+  </div>
+</div>
 
       <button class="f-reset" onclick="resetFilters()">✕ Réinitialiser</button>
       <span class="f-count" id="elementCount">— éléments</span>
