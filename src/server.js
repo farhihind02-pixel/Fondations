@@ -14,8 +14,8 @@ const {
   PORT = 3000,
 } = process.env;
 
-const VERSION_URN    = 'urn:adsk.wipprod:fs.file:vf.95ZduzNQSfeN7oYyHNaaPw?version=3';
-const VIEWABLE_GUID  = '9bb67878-f427-1d63-5216-0512fd14651a';
+const VERSION_URN    = 'urn:adsk.wipprod:fs.file:vf.DhMqOcsvQrS7KGezUGjq2Q?version=3';
+const VIEWABLE_GUID  = '99d6c321-6a27-3668-9745-11f4564a1994';
 const DERIVATIVE_URN = Buffer.from(VERSION_URN).toString('base64')
   .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 
@@ -83,7 +83,7 @@ app.get('/api/model-urn', (_req, res) => {
   res.json({ urn: DERIVATIVE_URN, viewableGuid: VIEWABLE_GUID });
 });
 
-// ── Helper commun pour récupérer les propriétés ───────────────────────────────
+// ── Helper commun ─────────────────────────────────────────────────────────────
 async function fetchProps(token) {
   const metaResp = await fetch(
     `https://developer.api.autodesk.com/modelderivative/v2/designdata/${DERIVATIVE_URN}/metadata`,
@@ -133,6 +133,13 @@ app.get('/api/properties', async (_req, res) => {
       if (typeCode !== 'PI' && typeCode !== 'SI') continue;
       const etatAvancement = String(P("OO-ETAT D'AVENCEMENT 1") || P('OO-ETAT DAVENCEMENT 1') || '').trim().toUpperCase();
       const rawZoneTrv = String(P('OOT-ZONE DE TRV') || P('OOT_ZONE DE TRV') || '').trim().toLowerCase();
+
+      // ── Paramètre ENTREPRISE (texte) ──────────────────
+      // Essayer plusieurs variantes de noms possibles dans Revit
+      const entrepriseRaw = P('ENTREPRISE') || P('Entreprise') || P('entreprise') ||
+                            P('OOP_Entreprise') || P('OOP-ENTREPRISE') || '';
+      const entreprise = String(entrepriseRaw || '').trim().toUpperCase();
+
       elements.push({
         dbId:        obj.objectid,
         name:        obj.name || '',
@@ -143,6 +150,7 @@ app.get('/api/properties', async (_req, res) => {
         subType:     String(P('OOP_Sub Type') || P('ME_ELEMENT SUB TYPE') || '').trim(),
         subzone:     String(P('ME_ELEMENT SUB ZONE') || P('ME_ELEMENT SUBZONE') || '').trim(),
         elementZone: String(P('ME_ELEMENT ZONE') || '').trim().toUpperCase(),
+        entreprise,  // ← paramètre texte ENTREPRISE (ex: 'TGCC', 'SGTM')
         volume:      Math.round((parseFloat(String(P('ME_VOLUME') || '').replace(/[^0-9.]/g, '')) || 0) * 100) / 100,
         length:      parseFloat(String(P('ME_LENGTH') || '').replace(/[^0-9.]/g, '')) || 0,
         betonne:     toBool(P('OOP-BETONNE')),
@@ -159,6 +167,25 @@ app.get('/api/properties', async (_req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── /api/debug-entreprise — pour vérifier les valeurs du paramètre ────────────
+app.get('/api/debug-entreprise', async (_req, res) => {
+  try {
+    const token = await getValidToken();
+    const { collection } = await fetchProps(token);
+    const stats = {};
+    for (const obj of collection) {
+      const P = buildPropMap(obj.properties);
+      if (String(P('ME_ELEMENT TYPE') || '').trim().toUpperCase() !== 'PI') continue;
+      const val = String(
+        P('ENTREPRISE') || P('Entreprise') || P('entreprise') ||
+        P('OOP_Entreprise') || P('OOP-ENTREPRISE') || '(vide)'
+      ).trim().toUpperCase();
+      stats[val] = (stats[val] || 0) + 1;
+    }
+    res.json({ stats, total: Object.values(stats).reduce((a,b)=>a+b,0) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── /api/debug-subzones ───────────────────────────────────────────────────────
 app.get('/api/debug-subzones', async (_req, res) => {
   try {
@@ -170,14 +197,12 @@ app.get('/api/debug-subzones', async (_req, res) => {
       const P = buildPropMap(obj.properties);
       if (String(P('ME_ELEMENT TYPE') || '').trim().toUpperCase() !== 'PI') continue;
       const subzone = String(P('ME_ELEMENT SUB ZONE') || '').trim();
-      const tgcc    = P('TGCC');
       const vol     = parseFloat(String(P('ME_VOLUME') || '').replace(/[^0-9.]/g, '')) || 0;
       totalVol += vol;
       const key = subzone || '(vide)';
-      if (!stats[key]) stats[key] = { count: 0, volume: 0, tgccCount: 0 };
+      if (!stats[key]) stats[key] = { count: 0, volume: 0 };
       stats[key].count++;
       stats[key].volume = Math.round((stats[key].volume + vol) * 100) / 100;
-      if (tgcc === 1 || tgcc === '1' || tgcc === true) stats[key].tgccCount++;
     }
     res.json({ totalVolume: Math.round(totalVol * 100) / 100, subzones: stats });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -210,7 +235,7 @@ app.get('/api/debug-fore', async (_req, res) => {
       if (!toBool(P('OOP-FORE'))) continue;
       const length = parseFloat(String(P('ME_LENGTH') || '0').replace(/[^0-9.]/g, '')) || 0;
       totalLen += length;
-      fores.push({ id: obj.objectid, name: obj.name, ME_LENGTH_RAW: P('ME_LENGTH'), length });
+      fores.push({ id: obj.objectid, name: obj.name, length });
     }
     res.json({ count: fores.length, totalLength: Math.round(totalLen * 100) / 100, fores: fores.slice(0, 20) });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -292,9 +317,8 @@ app.get(/^(?!\/api).*$/, (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-// ── Start — TOUJOURS EN DERNIER ───────────────────────────────────────────────
+// ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`
-🏗️  SGTM Fondations  →  http://localhost:${PORT}`);
+  console.log(`\n🏗️  SGTM Fondations  →  http://localhost:${PORT}`);
   console.log(`🔑 Login            →  http://localhost:${PORT}/api/auth/login`);
 });

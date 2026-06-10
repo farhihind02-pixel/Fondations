@@ -80,8 +80,6 @@
         <div class="f-menu" id="menuZone"><!-- rempli dynamiquement --></div>
       </div>
 
-
-
       <!-- Etat -->
       <div class="f-dropdown" id="ddEtat">
         <button class="f-btn" onclick="toggleDropdown('ddEtat')">
@@ -96,14 +94,17 @@
         </div>
       </div>
 
-      <!-- TGCC -->
-      <div class="f-dropdown" id="ddTGCC">
-        <button class="f-btn" onclick="toggleDropdown('ddTGCC')">
-          TGCC <span class="f-badge" id="badgeTGCC"></span>
+
+
+      <!-- Entreprise -->
+      <div class="f-dropdown" id="ddEntreprise">
+        <button class="f-btn" onclick="toggleDropdown('ddEntreprise')">
+          Entreprise <span class="f-badge" id="badgeEntreprise"></span>
           <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6,9 12,15 18,9"/></svg>
         </button>
-        <div class="f-menu" id="menuTGCC">
-          <label class="f-item"><input type="checkbox" value="TGCC" onchange="applyFilters()"> Éléments TGCC</label>
+        <div class="f-menu" id="menuEntreprise">
+          <label class="f-item"><input type="checkbox" value="TGCC" onchange="applyFilters()"> TGCC</label>
+          <label class="f-item"><input type="checkbox" value="SGTM" onchange="applyFilters()"> SGTM</label>
         </div>
       </div>
 
@@ -135,7 +136,6 @@
               <span class="kpi-val orange" id="kpiBetonne">—</span>
               <span class="kpi-sub" id="kpiBetonneVolume">— éléments bétonnés</span>
             </div>
-            
           </div>
           <div class="kpi kpi-with-donut">
             <div class="kpi-left-block">
@@ -143,11 +143,9 @@
               <span class="kpi-val navy" id="kpiFore">—</span>
               <span class="kpi-sub" id="kpiForeLength">— ml</span>
             </div>
-            
           </div>
         </div>
 
-        <!-- CHARTS ROW 1 -->
         <!-- BOTTOM ROW: 2 tableaux avancement -->
         <div class="bottom-row" style="flex-direction:column;gap:10px">
 
@@ -184,8 +182,6 @@
               </table>
             </div>
           </div>
-
-
 
           <!-- GRAPHES CÔTE À CÔTE -->
           <div style="display:flex;gap:10px">
