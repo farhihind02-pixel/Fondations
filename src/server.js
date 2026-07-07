@@ -5,6 +5,12 @@ const path    = require('path');
 
 const app = express();
 app.use(express.json());
+app.use((_req, res, next) => {
+  res.setHeader('X-Frame-Options', 'ALLOWALL');
+  res.setHeader('Content-Security-Policy', 'frame-ancestors *');
+  next();
+});
+
 app.use(express.static(path.join(__dirname, '../public')));
 
 const {
