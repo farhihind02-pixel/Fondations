@@ -20,7 +20,7 @@ const {
   PORT = 3000,
 } = process.env;
 
-const VERSION_URN    = 'urn:adsk.wipprod:fs.file:vf.6nUM4v2vTUC8rBM9fTkEfA?version=4';
+const VERSION_URN = 'urn:adsk.wipprod:fs.file:vf.VLkXuZ_oTXy6eoJrACxjnQ?version=2';
 const VIEWABLE_GUID  = '7a6f05d0-a271-92da-5c30-a08b214d7678';
 const DERIVATIVE_URN = Buffer.from(VERSION_URN).toString('base64')
   .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
@@ -319,23 +319,6 @@ app.get('/api/acc-status', async (_req, res) => {
 });
 
 // ── Catch-all ─────────────────────────────────────────────────────────────────
-app.get('/api/debug-all-params', async (_req, res) => {
-  try {
-    const token = await getValidToken();
-    const { collection } = await fetchProps(token);
-    let pi = null;
-    for (const obj of collection) {
-      const flat = {};
-      Object.values(obj.properties || {}).forEach(g => { if (typeof g === 'object') Object.assign(flat, g); });
-      if (flat['ME_ELEMENT TYPE'] === 'PI') {
-        pi = { name: obj.name, allParams: flat };
-        break;
-      }
-    }
-    if (!pi) return res.json({ error: 'Aucun PI trouvé' });
-    res.json(pi);
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
 app.get(/^(?!\/api).*$/, (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
