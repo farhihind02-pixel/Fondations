@@ -155,7 +155,7 @@ function buildMenu(menuId, items) {
 }
 
 function populateFilters() {
-  const subzones = [...new Set(allElements.map(e => e.subzone).filter(Boolean))].sort(naturalSort);
+ const subzones = [...new Set(allElements.map(e => e.subzone).filter(Boolean))].sort(naturalSort);
   document.getElementById('menuZone').innerHTML = buildMenu('menuZone',
     subzones.map(z => `<label class="f-item"><input type="checkbox" value="${z}" onchange="syncSelectAll('menuZone')"> ${z}</label>`).join('')
   );
