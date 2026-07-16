@@ -257,7 +257,7 @@ function updateCharts() {
   const bPct = totalVol ? Math.round(betonneVol / totalVol * 100) : 0;
   mkChart('chartBetonnePie', 'doughnut', {
     labels: [`Volume réalisé — ${bPct}%`, `Reste — ${100-bPct}%`],
-    datasets: [{ data:[betonneVol, Math.max(0,totalVol-betonneVol)], backgroundColor:['#ffa017','#e5e7eb'], borderWidth:3, borderColor:'#fff', hoverOffset:4 }]
+    datasets: [{ data:[betonneVol, Math.max(0,totalVol-betonneVol)], backgroundColor:['#D7AA48','#e5e7eb'], borderWidth:3, borderColor:'#fff', hoverOffset:4 }]
   }, { responsive:true, maintainAspectRatio:false, cutout:'65%', plugins:{ legend:{...LEG,position:'right'}, tooltip:{...TT,callbacks:{label:ctx=>` ${fmt(ctx.raw)} m³`}} } });
 
   const profTotale = sum(filteredElements, 'length');
@@ -308,9 +308,9 @@ function showViewerLogin() {
   const ph = document.getElementById('viewerPlaceholder');
   if (ph) ph.innerHTML = `
     <div class="viewer-ph-inner">
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ffa017" stroke-width="1.5"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D7AA48" stroke-width="1.5"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
       <p style="color:#6b7280;margin-bottom:12px">Connectez-vous avec votre compte Autodesk</p>
-      <button onclick="window.location.href='/api/auth/login'" style="background:#ffa017;color:#fff;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit">
+      <button onclick="window.location.href='/api/auth/login'" style="background:#D7AA48;color:#fff;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit">
         Se connecter à ACC
       </button>
     </div>`;
