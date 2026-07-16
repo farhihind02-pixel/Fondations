@@ -6,11 +6,11 @@
   --orange-bg:   rgba(215,170,72,0.12);
   --navy:        #1e3a5f;
   --navy-bg:     rgba(30,58,95,0.12);
-  --bg:          #eef0f4;
+  --bg:          #f0f2f5;
   --white:       #ffffff;
   --border:      #e2e5ea;
-  --dark:        #16213e;
-  --dark2:       #1e2d4a;
+  --dark:        #1a1a1a;
+  --dark2:       #212121;
   --dark-border: rgba(255,255,255,0.08);
   --text:        #1a1d23;
   --text-light:  #e8e9ec;
@@ -53,23 +53,23 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 .legend-row { display: flex; align-items: center; gap: 7px; font-size: 0.78rem; color: var(--muted-dark); margin-bottom: 5px; }
 .ldot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 
-.btn-export { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; background: var(--orange); color: #16213e; border: none; border-radius: 8px; padding: 9px; font-family: var(--font); font-weight: 600; font-size: 0.78rem; cursor: pointer; transition: background .15s; }
+.btn-export { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; background: var(--orange); color: #fff; border: none; border-radius: 8px; padding: 9px; font-family: var(--font); font-weight: 600; font-size: 0.78rem; cursor: pointer; transition: background .15s; }
 .btn-export:hover { background: #c93a08; }
 
 /* ── MAIN ────────────────────────────────────────────── */
 .main { flex: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; min-width: 0; }
 
 /* ── TOPBAR ──────────────────────────────────────────── */
-.topbar { display: none; }
+.topbar { height: var(--topbar-h); background: var(--dark); border-bottom: 1px solid var(--dark-border); display: flex; align-items: center; padding: 0 16px; gap: 16px; flex-shrink: 0; }
 .topbar-meta { font-size: 0.9rem; color: #ffffff; white-space: nowrap; flex-shrink: 0; }
-.tp-label { color: #ffa017; font-weight: 700; font-size: 0.9rem; letter-spacing: .8px; text-transform: uppercase; }
+.tp-label { color: #D7AA48; font-weight: 700; font-size: 0.9rem; letter-spacing: .8px; text-transform: uppercase; }
 .tp-sep { color: var(--dark-border); margin: 0 4px; }
-.topbar-title { font-size: 1.1rem; font-weight: 700; color: #ffa017; white-space: nowrap; flex-shrink: 0; margin-left: auto; }
+.topbar-title { font-size: 1.1rem; font-weight: 700; color: #D7AA48; white-space: nowrap; flex-shrink: 0; margin-left: auto; }
 .topbar-right { display: flex; align-items: center; gap: 7px; margin-left: auto; flex-shrink: 0; }
 
 .acc-pill { display: flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 99px; font-size: 0.74rem; font-weight: 500; border: 1px solid var(--dark-border); }
 .acc-on  { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.3); color: #4ade80; }
-.acc-off { background: var(--orange-bg); border-color: rgba(232,70,10,0.3); color: var(--orange); }
+.acc-off { background: var(--orange-bg); border-color: rgba(215,170,72,0.3); color: var(--orange); }
 
 .btn-topbar { display: flex; align-items: center; gap: 5px; background: rgba(255,255,255,0.07); border: 1px solid var(--dark-border); color: var(--muted-dark); padding: 4px 10px; border-radius: 7px; font-size: 0.74rem; font-family: var(--font); cursor: pointer; transition: all .15s; }
 .btn-topbar:hover { border-color: var(--orange); color: var(--orange); }
@@ -121,7 +121,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 }
 
 .f-item-all { border-bottom: none; font-weight: 600; color: #fff !important; }
-.f-item-all:hover { background: rgba(232,70,10,0.12) !important; }
+.f-item-all:hover { background: rgba(215,170,72,0.12) !important; }
 .f-item-all input { accent-color: var(--orange); }
 .f-divider { height: 1px; background: #333; margin: 2px 0 4px; }
 
@@ -182,7 +182,7 @@ tbody tr:hover { background: #fafbfc; }
 .td-dim  { color: var(--muted); font-size: 0.9rem; }
 .badge-p { background: var(--orange-bg); color: var(--orange); padding: 1px 6px; border-radius: 3px; font-size: 0.65rem; font-weight: 700; }
 .badge-zone { background: #f0f4ff; color: #1e3a5f; padding: 2px 8px; border-radius: 3px; font-weight: 700; white-space: nowrap; }
-.td-orange { color: #ffa017; font-weight: 600; }
+.td-orange { color: #D7AA48; font-weight: 600; }
 .td-navy   { color: #1e3a5f; font-weight: 600; }
 .pct-inline { display: flex; align-items: center; gap: 6px; }
 .pct-track { flex: 1; max-width: 55px; height: 3px; background: var(--border); border-radius: 99px; }
