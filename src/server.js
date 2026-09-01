@@ -20,7 +20,7 @@ const {
   PORT = 3000,
 } = process.env;
 
-const VERSION_URN = 'urn:adsk.wipprod:fs.file:vf.6nUM4v2vTUC8rBM9fTkEfA?version=22';
+const VERSION_URN = 'urn:adsk.wipprod:fs.file:vf.6nUM4v2vTUC8rBM9fTkEfA?version=23';
 const VIEWABLE_GUID  = '7a6f05d0-a271-92da-5c30-a08b214d7678';
 const DERIVATIVE_URN = Buffer.from(VERSION_URN).toString('base64')
   .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
