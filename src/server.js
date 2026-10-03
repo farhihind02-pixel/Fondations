@@ -19,7 +19,7 @@ const {
   APS_CALLBACK_URL = 'http://localhost:3000/api/auth/callback',
   PORT = 3000,
 } = process.env;
-const VERSION_URN    = 'urn:adsk.wipprod:fs.file:vf.6nUM4v2vTUC8rBM9fTkEfA?version=29';
+const VERSION_URN    = 'urn:adsk.wipprod:fs.file:vf.6nUM4v2vTUC8rBM9fTkEfA?version=32';
 const VIEWABLE_GUID  = '7a6f05d0-a271-92da-5c30-a08b214d7678';
 const DERIVATIVE_URN = Buffer.from(VERSION_URN).toString('base64')
   .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
@@ -155,7 +155,7 @@ app.get('/api/properties', async (_req, res) => {
         subType:     String(P('OOP_Sub Type') || P('ME_ELEMENT SUB TYPE') || '').trim(),
         subzone:     String(P('ME_ELEMENT SUB ZONE') || P('ME_ELEMENT SUBZONE') || '').trim(),
         elementZone: String(P('ME_ELEMENT ZONE') || '').trim().toUpperCase(),
-        entreprise,  // ← paramètre texte ENTREPRISE (ex: 'TGCC', 'SGTM')
+        entreprise,
         volume:      Math.round((parseFloat(String(P('ME_VOLUME') || '').replace(/[^0-9.]/g, '')) || 0) * 100) / 100,
         length:      parseFloat(String(P('ME_LENGTH') || '').replace(/[^0-9.]/g, '')) || 0,
         betonne:     toBool(P('OOP-BETONNE')),
@@ -166,6 +166,14 @@ app.get('/api/properties', async (_req, res) => {
         etatAvancement,
         elevBase: parseFloat(String(P('Elevation a la base') || '0').replace(/[^0-9.\-]/g, '')) || 0,
         elevHaut: parseFloat(String(P('Elevation en haut')   || '0').replace(/[^0-9.\-]/g, '')) || 0,
+        // ── Paramètres Semelles (SI) ──────────────────────────────
+        // Dans la maquette le paramètre s'appelle "TERRASSEMENT" (Yes/No)
+        nbrTerrassement: toBool(P('TERRASSEMENT') || P('NBR TERRASSEMENT')),
+        ferraille:       toBool(P('FERRAILLE')        || P('ferraille')),
+        betonneSI:       toBool(P('BETONNE')          || P('betonne')),
+        tiges:           toBool(P('Tiges et platines') || P('TIGES ET PLATINES') || P('tiges et platines')),
+        ferraillageEnCours: toBool(P('Ferraillage en cours')),
+        identifiant:     String(obj.properties?.["Données d'identification"]?.Identifiant || P('Identifiant') || '').trim(),
       });
     }
     res.json({ total: elements.length, elements });
@@ -224,6 +232,33 @@ app.get('/api/debug-pi', async (_req, res) => {
     });
     if (!pi) return res.json({ error: 'Aucun PI trouvé' });
     res.json({ objectid: pi.objectid, name: pi.name, properties: pi.properties });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── /api/debug-si — vrais noms/valeurs des paramètres Semelles ───────────────
+app.get('/api/debug-si', async (_req, res) => {
+  try {
+    const token = await getValidToken();
+    const { collection } = await fetchProps(token);
+    const si = collection.filter(o => {
+      const P = buildPropMap(o.properties);
+      return String(P('ME_ELEMENT TYPE') || '').trim().toUpperCase() === 'SI';
+    });
+    const kw = /terrass|ferr|beton|béton|tige|platine/i;
+    const params = {}; // "Groupe > Nom" → { valeur: nb }
+    for (const o of si) {
+      for (const [grp, g] of Object.entries(o.properties || {})) {
+        if (typeof g !== 'object' || g === null) continue;
+        for (const [k, v] of Object.entries(g)) {
+          if (!kw.test(k)) continue;
+          const key = `${grp} > ${k}`;
+          params[key] = params[key] || {};
+          const val = JSON.stringify(v);
+          params[key][val] = (params[key][val] || 0) + 1;
+        }
+      }
+    }
+    res.json({ totalSI: si.length, params, sample: si[0] ? { objectid: si[0].objectid, name: si[0].name, properties: si[0].properties } : null });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

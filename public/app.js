@@ -26,6 +26,7 @@ const STATIC_DATA = [
 
 let allElements      = [];
 let filteredElements = [];
+let siElements       = []; // Semelles (ME_ELEMENT TYPE = SI), séparées des pieux
 let charts           = {};
 let viewer           = null;
 let viewerLoaded     = false;
@@ -106,6 +107,20 @@ async function loadData() {
           betonneEtat:    Number(e.betonneEtat),
           etatAvancement: String(e.etatAvancement || '').trim().toUpperCase(),
           elementZone:    String(e.elementZone || '').trim().toUpperCase(),
+        }));
+      siElements = data.elements
+        .filter(e => (e.elementType || '').toUpperCase() === 'SI')
+        .map(e => ({
+          dbId:            e.dbId,
+          name:            e.name || '',
+          elementType:     'SI',
+          subzone:         String(e.subzone || '').trim(),
+          nbrTerrassement: Number(e.nbrTerrassement) || 0,
+          ferraille:       Number(e.ferraille)       || 0,
+          betonneSI:       Number(e.betonneSI)       || 0,
+          tiges:           Number(e.tiges)           || 0,
+          ferraillageEnCours: Number(e.ferraillageEnCours) || 0,
+          identifiant:     String(e.identifiant || '').trim(),
         }));
     } else throw new Error('fallback');
   } catch {
@@ -239,6 +254,74 @@ function updateKPIs() {
   const unionCount = filteredElements.filter(e => e.betonneEtat === 1 || e.etatAvancement === 'FORE').length;
   document.getElementById('kpiFore').textContent       = fmt(profFore) + ' ml';
   document.getElementById('kpiForeLength').textContent = unionCount.toLocaleString('fr-FR') + ' éléments';
+  updateSemelles();
+}
+
+// ── Semelles KPIs & Tableaux ─────────────────────────────────────────────────
+function updateSemelles() {
+  // Toujours utiliser TOUS les éléments SI (pas filtrés par Zone/Etat/Entreprise)
+  const allSI = siElements;
+  const total = allSI.length;
+
+  // KPI semelles totales
+  const kpiTot = document.getElementById('kpiSemellesTotales');
+  if (kpiTot) kpiTot.textContent = total;
+
+  if (total === 0) return;
+
+  // La maquette ne coche que l'étape ACTUELLE de chaque semelle (ex. une semelle
+  // bétonnée n'a pas TERRASSEMENT = Yes). Ordre réel des phases :
+  // Terrassement → Ferraillage → Tiges et platines → Bétonnage.
+  // Une phase est achevée si la semelle a atteint cette étape OU une étape suivante.
+  const phases = [
+    { label: 'Terrassement',      rank: 1 },
+    { label: 'Ferraillage',       rank: 2 },
+    { label: 'Tiges et platines', rank: 3 },
+    { label: 'Bétonnage',         rank: 4 },
+  ];
+  const stage = e => e.betonneSI === 1 ? 4 : e.tiges === 1 ? 3 : e.ferraille === 1 ? 2 : e.nbrTerrassement === 1 ? 1 : 0;
+  const acheves = rank => allSI.filter(e => stage(e) >= rank);
+  const pctOf = n => Math.round(n / total * 100);
+
+  const elTerr  = document.getElementById('kpiTerrassementPct');
+  const elBeton = document.getElementById('kpiBetonProprePct');
+  const elGlob  = document.getElementById('kpiAvancementGlobalSI');
+  if (elTerr)  elTerr.textContent  = pctOf(acheves(1).length) + ' %';
+  // KPI Ferraillage achevé
+  if (elBeton) elBeton.textContent = pctOf(acheves(2).length) + ' %';
+  // KPI Bétonnage achevé
+  if (elGlob)  elGlob.textContent  = pctOf(acheves(4).length) + ' %';
+
+  // Tableau phases
+  const tbody = document.getElementById('tableSemellesBody');
+  if (tbody) {
+    tbody.innerHTML = phases.map(ph => {
+      const acheve  = acheves(ph.rank).length;
+      // En cours : seulement Ferraillage (paramètre maquette "Ferraillage en cours"), '—' pour les autres phases
+      const enCours = ph.rank === 2 ? allSI.filter(e => e.ferraillageEnCours === 1).length : '—';
+      return `<tr>
+        <td style="text-align:left;font-weight:600">${ph.label}</td>
+        <td style="text-align:center">${acheve}</td>
+        <td style="text-align:center">${enCours}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Tableau semelles en cours
+  const tbody2 = document.getElementById('tableSemellesEnCoursBody');
+  if (tbody2) {
+    // Paramètre maquette "Ferraillage en cours" = Yes → on affiche le paramètre Identifiant
+    const ferrEnCours = allSI.filter(e => e.ferraillageEnCours === 1);
+    const names = ferrEnCours
+      .map(e => `<span style="color:#ffa017;font-weight:600">${e.identifiant || e.name || e.dbId}</span>`)
+      .join('<span style="color:#9ca3af;margin:0 8px">|</span>');
+    tbody2.innerHTML = ferrEnCours.length > 0
+      ? `<tr>
+          <td style="text-align:left;font-weight:600;color:#16213e">Ferraillage</td>
+          <td style="text-align:left;font-size:11px">${names}</td>
+        </tr>`
+      : '<tr><td colspan="2" style="text-align:center;color:#9ca3af">Aucun élément en cours</td></tr>';
+  }
 }
 
 const TT  = { backgroundColor:'#fff', titleColor:'#1a1d23', bodyColor:'#6b7280', borderColor:'#e2e5ea', borderWidth:1, padding:10, cornerRadius:8 };

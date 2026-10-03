@@ -181,6 +181,60 @@
             </div>
           </div>
 
+
+          <!-- KPIs SEMELLES -->
+          <div style="display:flex;gap:10px;margin-top:4px">
+            <div class="card" style="flex:1;text-align:center;padding:10px 6px">
+              <div style="font-size:28px;font-weight:900;color:#16213e" id="kpiSemellesTotales">—</div>
+              <div style="font-size:10px;color:#6b7a8d;margin-top:2px">Semelles totales</div>
+            </div>
+            <div class="card" style="flex:1;text-align:center;padding:10px 6px">
+              <div style="font-size:28px;font-weight:900;color:#ffa017" id="kpiTerrassementPct">—</div>
+              <div style="font-size:10px;color:#6b7a8d;margin-top:2px">Terrassement achevé</div>
+            </div>
+            <div class="card" style="flex:1;text-align:center;padding:10px 6px">
+              <div style="font-size:28px;font-weight:900;color:#22b07d" id="kpiBetonProprePct">—</div>
+              <div style="font-size:10px;color:#6b7a8d;margin-top:2px">Ferraillage</div>
+            </div>
+            <div class="card" style="flex:1;text-align:center;padding:10px 6px">
+              <div style="font-size:28px;font-weight:900;color:#3B82C4" id="kpiAvancementGlobalSI">—</div>
+              <div style="font-size:10px;color:#6b7a8d;margin-top:2px">Bétonnage</div>
+            </div>
+          </div>
+
+          <!-- TABLEAU AVANCEMENT SEMELLES -->
+          <div class="card" style="flex:none;margin-top:4px">
+            <p class="card-title avancement-title" id="dateAvancementSemelles">⬛ AVANCEMENT DES SEMELLES</p>
+            <div class="table-wrap">
+              <table class="tbl-avancement">
+                <thead>
+                  <tr class="thead-av">
+                    <th style="text-align:left">Phase</th>
+                    <th>Achevé</th>
+                    <th>En cours</th>
+                  </tr>
+                </thead>
+                <tbody id="tableSemellesBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- TABLEAU SEMELLES EN COURS -->
+          <div class="card" style="flex:none;margin-top:4px">
+            <p class="card-title avancement-title">⬛ SEMELLES ACTUELLEMENT EN COURS</p>
+            <div class="table-wrap">
+              <table class="tbl-avancement" id="tableSemellesEnCours">
+                <thead>
+                  <tr class="thead-av">
+                    <th style="text-align:left">Phase</th>
+                    <th style="text-align:left">Éléments en cours</th>
+                  </tr>
+                </thead>
+                <tbody id="tableSemellesEnCoursBody"></tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
 
       </div><!-- /left -->
