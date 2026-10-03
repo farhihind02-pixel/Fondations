@@ -27,6 +27,7 @@ const STATIC_DATA = [
 let allElements      = [];
 let filteredElements = [];
 let siElements       = []; // Semelles (ME_ELEMENT TYPE = SI), séparées des pieux
+let filteredSI       = []; // Semelles filtrées par Zone et Entreprise
 let charts           = {};
 let viewer           = null;
 let viewerLoaded     = false;
@@ -115,6 +116,7 @@ async function loadData() {
           name:            e.name || '',
           elementType:     'SI',
           subzone:         String(e.subzone || '').trim(),
+          entreprise:      String(e.entreprise || '').trim().toUpperCase(),
           nbrTerrassement: Number(e.nbrTerrassement) || 0,
           ferraille:       Number(e.ferraille)       || 0,
           betonneSI:       Number(e.betonneSI)       || 0,
@@ -127,6 +129,7 @@ async function loadData() {
     allElements = STATIC_DATA;
   }
   filteredElements = [...allElements];
+  filteredSI       = [...siElements];
   populateFilters();
   refresh();
 }
@@ -170,7 +173,7 @@ function buildMenu(menuId, items) {
 }
 
 function populateFilters() {
- const subzones = [...new Set(allElements.map(e => e.subzone).filter(Boolean))].sort(naturalSort);
+  const subzones = [...new Set([...allElements, ...siElements].map(e => e.subzone).filter(Boolean))].sort(naturalSort);
   document.getElementById('menuZone').innerHTML = buildMenu('menuZone',
     subzones.map(z => `<label class="f-item"><input type="checkbox" value="${z}" onchange="syncSelectAll('menuZone')"> ${z}</label>`).join('')
   );
@@ -215,6 +218,12 @@ function applyFilters() {
     return okZone && okEtat && okEntreprise;
   });
 
+  // Semelles : filtres Zone et Entreprise (le filtre Etat concerne les pieux)
+  filteredSI = siElements.filter(e =>
+    (zones.length === 0 || zones.includes(e.subzone)) &&
+    (entreprise.length === 0 || entreprise.includes(e.entreprise))
+  );
+
   refresh();
   updateViewerHighlight();
 }
@@ -226,6 +235,7 @@ function resetFilters() {
     if (el) { el.textContent = ''; el.classList.remove('visible'); }
   });
   filteredElements = [...allElements];
+  filteredSI       = [...siElements];
   refresh();
   resetViewerHighlight();
 }
@@ -259,15 +269,13 @@ function updateKPIs() {
 
 // ── Semelles KPIs & Tableaux ─────────────────────────────────────────────────
 function updateSemelles() {
-  // Toujours utiliser TOUS les éléments SI (pas filtrés par Zone/Etat/Entreprise)
-  const allSI = siElements;
+  // Semelles filtrées par Zone et Entreprise
+  const allSI = filteredSI;
   const total = allSI.length;
 
   // KPI semelles totales
   const kpiTot = document.getElementById('kpiSemellesTotales');
   if (kpiTot) kpiTot.textContent = total;
-
-  if (total === 0) return;
 
   // La maquette ne coche que l'étape ACTUELLE de chaque semelle (ex. une semelle
   // bétonnée n'a pas TERRASSEMENT = Yes). Ordre réel des phases :
@@ -281,7 +289,7 @@ function updateSemelles() {
   ];
   const stage = e => e.betonneSI === 1 ? 4 : e.tiges === 1 ? 3 : e.ferraille === 1 ? 2 : e.nbrTerrassement === 1 ? 1 : 0;
   const acheves = rank => allSI.filter(e => stage(e) >= rank);
-  const pctOf = n => Math.round(n / total * 100);
+  const pctOf = n => total > 0 ? Math.round(n / total * 100) : 0;
 
   const elTerr  = document.getElementById('kpiTerrassementPct');
   const elBeton = document.getElementById('kpiBetonProprePct');
