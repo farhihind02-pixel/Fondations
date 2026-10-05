@@ -27,7 +27,7 @@ const STATIC_DATA = [
 let allElements      = [];
 let filteredElements = [];
 let siElements       = []; // Semelles (ME_ELEMENT TYPE = SI), séparées des pieux
-let filteredSI       = []; // Semelles filtrées par Zone et Entreprise
+let filteredSI       = []; // Semelles filtrées par Elément, Zone et Entreprise
 let charts           = {};
 let viewer           = null;
 let viewerLoaded     = false;
@@ -173,6 +173,11 @@ function buildMenu(menuId, items) {
 }
 
 function populateFilters() {
+  // Filtre Elément → ME_ELEMENT TYPE, limité aux pieux (PI) et semelles (SI)
+  document.getElementById('menuElement').innerHTML = buildMenu('menuElement',
+    ['PI', 'SI'].map(t => `<label class="f-item"><input type="checkbox" value="${t}" onchange="syncSelectAll('menuElement')"> ${t}</label>`).join('')
+  );
+
   const subzones = [...new Set([...allElements, ...siElements].map(e => e.subzone).filter(Boolean))].sort(naturalSort);
   document.getElementById('menuZone').innerHTML = buildMenu('menuZone',
     subzones.map(z => `<label class="f-item"><input type="checkbox" value="${z}" onchange="syncSelectAll('menuZone')"> ${z}</label>`).join('')
@@ -192,15 +197,20 @@ function updateBadge(badgeId, values) {
 
 // ── FILTRE PRINCIPAL ──────────────────────────────────────
 function applyFilters() {
+  const types      = getCheckedValues('menuElement');
   const zones      = getCheckedValues('menuZone');
   const etats      = getCheckedValues('menuEtat');
   const entreprise = getCheckedValues('menuEntreprise');
 
+  // Filtre Elément → ME_ELEMENT TYPE (aucune sélection = tous les types)
+  const okType = t => types.length === 0 || types.includes(t);
+
+  updateBadge('badgeElement',    types);
   updateBadge('badgeZone',       zones);
   updateBadge('badgeEtat',       etats);
   updateBadge('badgeEntreprise', entreprise);
 
-  filteredElements = allElements.filter(e => {
+  filteredElements = !okType('PI') ? [] : allElements.filter(e => {
     // Filtre Zone → ME_ELEMENT SUB ZONE
     const okZone = zones.length === 0 || zones.includes(e.subzone);
 
@@ -218,11 +228,18 @@ function applyFilters() {
     return okZone && okEtat && okEntreprise;
   });
 
-  // Semelles : filtres Zone et Entreprise (le filtre Etat concerne les pieux)
+  // Semelles : filtres Zone et Entreprise (le filtre Etat concerne les pieux).
+  // Le filtre Elément n'est PAS appliqué ici : les blocs semelles cachés gardent leur contenu
+  // (donc leur hauteur) pour que la disposition ne bouge pas. Il est appliqué dans visibleElements().
   filteredSI = siElements.filter(e =>
     (zones.length === 0 || zones.includes(e.subzone)) &&
     (entreprise.length === 0 || entreprise.includes(e.entreprise))
   );
+
+  // Masquer les blocs pieux / semelles non sélectionnés.
+  // Pieux (en haut) retirés de la page pour que les semelles remontent ; semelles (en bas) juste cachées.
+  showSections('.sec-pi', okType('PI'), true);
+  showSections('.sec-si', okType('SI'));
 
   refresh();
   updateViewerHighlight();
@@ -230,19 +247,30 @@ function applyFilters() {
 
 function resetFilters() {
   document.querySelectorAll('.f-menu input[type="checkbox"]').forEach(cb => cb.checked = false);
-  ['badgeZone','badgeEtat','badgeEntreprise'].forEach(id => {
+  ['badgeElement','badgeZone','badgeEtat','badgeEntreprise'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.textContent = ''; el.classList.remove('visible'); }
   });
   filteredElements = [...allElements];
   filteredSI       = [...siElements];
+  showSections('.sec-pi', true, true);
+  showSections('.sec-si', true);
   refresh();
   resetViewerHighlight();
 }
 
+// collapse = false : visibility → le bloc est caché mais garde sa place (la disposition ne bouge pas)
+// collapse = true  : display   → le bloc est retiré, les blocs suivants remontent
+function showSections(selector, visible, collapse = false) {
+  document.querySelectorAll(selector).forEach(el => {
+    // Classes CSS (et non el.style.display) pour ne pas écraser le display:flex inline des blocs
+    el.classList.toggle(collapse ? 'sec-collapsed' : 'sec-invisible', !visible);
+  });
+}
+
 function refresh() {
   document.getElementById('elementCount').textContent =
-    `${filteredElements.length.toLocaleString('fr-FR')} éléments`;
+    `${visibleElements().length.toLocaleString('fr-FR')} éléments`;
   updateKPIs();
   updateCharts();
   updateTable();
@@ -448,17 +476,24 @@ function hasActiveFilters() {
   return document.querySelectorAll('.f-menu input[type="checkbox"]:checked').length > 0;
 }
 
+// Tous les éléments retenus par les filtres (pieux + semelles)
+function visibleElements() {
+  // Filtre Etat actif → il ne concerne que les pieux : semelles masquées dans le viewer
+  if (getCheckedValues('menuEtat').length > 0) return [...filteredElements];
+  const types = getCheckedValues('menuElement');
+  const showSI = types.length === 0 || types.includes('SI');
+  return [...filteredElements, ...(showSI ? filteredSI : [])];
+}
+
 function updateViewerHighlight() {
   if (!viewerLoaded || !viewer || !window.THREE) return;
   if (!hasActiveFilters()) { resetViewerHighlight(); return; }
-  const filteredIds = filteredElements.map(e => e.dbId).filter(id => typeof id === 'number');
+  const filteredIds = visibleElements().map(e => e.dbId).filter(id => typeof id === 'number');
   viewer.isolate(filteredIds);
   if (filteredIds.length > 0) setTimeout(() => viewer.fitToView(filteredIds, viewer.model, false), 300);
   viewer.clearThemingColors(viewer.model);
   const orange = new THREE.Vector4(1.0, 0.627, 0.090, 1);
-  filteredElements.forEach(e => {
-    if (typeof e.dbId === 'number') viewer.setThemingColor(e.dbId, orange, viewer.model, true);
-  });
+  filteredIds.forEach(id => viewer.setThemingColor(id, orange, viewer.model, true));
   viewer.impl && viewer.impl.invalidate(true, true, true);
 }
 

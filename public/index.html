@@ -57,6 +57,15 @@
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffa017" stroke-width="2.5"><polygon points="22,3 2,3 10,12.46 10,19 14,21 14,12.46 22,3"/></svg>
       <span class="f-label">FILTRES</span>
 
+      <!-- Elément (ME_ELEMENT TYPE) -->
+      <div class="f-dropdown" id="ddElement">
+        <button class="f-btn" onclick="toggleDropdown('ddElement')">
+          Elément <span class="f-badge" id="badgeElement"></span>
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6,9 12,15 18,9"/></svg>
+        </button>
+        <div class="f-menu" id="menuElement"><!-- rempli dynamiquement --></div>
+      </div>
+
       <!-- Zone -->
       <div class="f-dropdown" id="ddZone">
         <button class="f-btn" onclick="toggleDropdown('ddZone')">
@@ -105,7 +114,7 @@
       <div class="left-panel">
 
         <!-- KPI ROW -->
-        <div class="kpi-row">
+        <div class="kpi-row sec-pi">
           <div class="kpi kpi-accent">
             <span class="kpi-label">PROFONDEUR TOTALE PIEUX</span>
             <span class="kpi-val orange" id="kpiPieuxCount">—</span>
@@ -136,7 +145,7 @@
         <div class="bottom-row" style="flex-direction:column;gap:10px">
 
           <!-- TABLEAU COULAGE -->
-          <div class="card" style="flex:none">
+          <div class="card sec-pi" style="flex:none">
             <p class="card-title avancement-title">⬛ AVANCEMENT COULAGE PIEUX</p>
             <div class="table-wrap">
               <table class="tbl-avancement">
@@ -153,7 +162,7 @@
           </div>
 
           <!-- TABLEAU FORAGE -->
-          <div class="card" style="flex:none">
+          <div class="card sec-pi" style="flex:none">
             <p class="card-title avancement-title">⬛ AVANCEMENT FORAGE PIEUX</p>
             <div class="table-wrap">
               <table class="tbl-avancement">
@@ -170,7 +179,7 @@
           </div>
 
           <!-- GRAPHES CÔTE À CÔTE -->
-          <div style="display:flex;gap:10px">
+          <div class="sec-pi" style="display:flex;gap:10px">
             <div class="card" style="flex:1">
               <p class="card-title" style="text-align:center">Volume bétonné vs total (m³)</p>
               <div class="chart-box"><canvas id="chartBetonnePie"></canvas></div>
@@ -183,7 +192,7 @@
 
 
           <!-- KPIs SEMELLES -->
-          <div style="display:flex;gap:10px;margin-top:4px">
+          <div class="sec-si" style="display:flex;gap:10px;margin-top:4px">
             <div class="card" style="flex:1;text-align:center;padding:10px 6px">
               <div style="font-size:28px;font-weight:900;color:#16213e" id="kpiSemellesTotales">—</div>
               <div style="font-size:10px;color:#6b7a8d;margin-top:2px">Semelles totales</div>
@@ -203,7 +212,7 @@
           </div>
 
           <!-- TABLEAU AVANCEMENT SEMELLES -->
-          <div class="card" style="flex:none;margin-top:4px">
+          <div class="card sec-si" style="flex:none;margin-top:4px">
             <p class="card-title avancement-title" id="dateAvancementSemelles">⬛ AVANCEMENT DES SEMELLES</p>
             <div class="table-wrap">
               <table class="tbl-avancement">
@@ -220,7 +229,7 @@
           </div>
 
           <!-- TABLEAU SEMELLES EN COURS -->
-          <div class="card" style="flex:none;margin-top:4px">
+          <div class="card sec-si" style="flex:none;margin-top:4px">
             <p class="card-title avancement-title">⬛ SEMELLES ACTUELLEMENT EN COURS</p>
             <div class="table-wrap">
               <table class="tbl-avancement" id="tableSemellesEnCours">
